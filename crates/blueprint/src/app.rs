@@ -30,6 +30,7 @@ pub enum Page {
     Songs,
     Setlist(Id),
     Patch(bp_core::patch_grid::PatchSheet),
+    Plan(Id),
 }
 
 /// What to do once unsaved changes are dealt with.
@@ -73,6 +74,9 @@ pub struct App {
     /// Transmitter out and spare chosen in the spare panel.
     pub(crate) spare_pick: (Option<Id>, Option<Id>),
     pub print: crate::app_print::PrintState,
+    /// The table shown for plans with two of them.
+    pub(crate) plan_part: HashMap<Id, bp_core::plan_grid::Part>,
+    pub stage: crate::app_stage::StageState,
 }
 
 impl App {
@@ -95,6 +99,8 @@ impl App {
             patch_cache: None,
             spare_pick: (None, None),
             print: Default::default(),
+            plan_part: HashMap::new(),
+            stage: Default::default(),
         };
         if let Some(p) = open {
             app.open_path(&p);
@@ -416,6 +422,7 @@ impl App {
                     Page::Songs => self.songs_page(ui),
                     Page::Setlist(id) => self.setlist_page(ui, id),
                     Page::Patch(s) => self.patch_page(ui, s),
+                    Page::Plan(id) => self.plan_page(ui, id),
                 });
         }
         self.modals(&ctx);
@@ -543,9 +550,35 @@ impl App {
             self.new_setlist();
         }
         section(ui, "MORE PLANS");
-        for p in ["Stage plot", "Run of show", "More plans"] {
-            ui.add_enabled(false, egui::Button::selectable(false, p).min_size(egui::vec2(ui.available_width(), 26.0)))
-                .on_disabled_hover_text("Coming in a later version");
+        let plans: Vec<(Id, String)> = self
+            .doc
+            .as_ref()
+            .map(|d| {
+                d.project
+                    .plans
+                    .iter()
+                    .map(|p| (p.id, if p.name.trim().is_empty() { p.kind.plan_type().label().to_string() } else { p.name.clone() }))
+                    .collect()
+            })
+            .unwrap_or_default();
+        for (id, name) in plans {
+            let on = self.page == Page::Plan(id);
+            let w = ui.available_width();
+            if ui.add(egui::Button::selectable(on, name).min_size(egui::vec2(w, 26.0))).clicked() {
+                self.page = Page::Plan(id);
+            }
+        }
+        let mut pick = None;
+        ui.menu_button(RichText::new("+ New plan").color(theme::MUTED), |ui| {
+            for t in bp_core::plans::PlanType::ALL {
+                if ui.button(t.label()).on_hover_text(t.hint()).clicked() {
+                    pick = Some(t);
+                    ui.close();
+                }
+            }
+        });
+        if let Some(t) = pick {
+            self.new_plan(t);
         }
     }
 

@@ -45,6 +45,9 @@ pub fn build(p: &Project, doc: Doc, opts: &Options) -> Data {
     if let Doc::Setlist(id) = doc {
         return Data(setlist(p, id, opts));
     }
+    if let Doc::Plan(id) = doc {
+        return Data(plan(p, id, opts));
+    }
     let view = MicView::build(p);
     let plan = &p.mic;
     let rev = if !doc.has_revision() {
@@ -86,7 +89,7 @@ pub fn build(p: &Project, doc: Doc, opts: &Options) -> Data {
         Doc::MonitorList => monitor_list(p),
         Doc::PackList => pack(p),
         Doc::Labels => labels(p),
-        Doc::Setlist(_) => Value::Null,
+        Doc::Setlist(_) | Doc::Plan(_) => Value::Null,
     };
     if let (Some(o), Value::Object(b)) = (d.as_object_mut(), body) {
         o.extend(b);
@@ -764,4 +767,149 @@ fn labels(p: &Project) -> Value {
         strips.push(json!({"title": title, "cells": cells, "per": 8}));
     }
     json!({ "strips": strips, "legend": "Cut along the dashed lines." })
+}
+
+/// Cells of a checkbox column print as a drawn box.
+const CHECKED: &str = "\u{1}check:1";
+const UNCHECKED: &str = "\u{1}check:0";
+
+/// One part of a plan as a table section: its own head, widths and rows.
+/// `group` names a column whose value splits the rows into sections.
+fn plan_sections(p: &Project, plan: Id, part: bp_core::plan_grid::Part, title: &str, group: Option<usize>) -> Vec<Value> {
+    use bp_core::grid::{ColKind, Grid};
+    let g = bp_core::plan_grid::PlanGrid { plan, part };
+    let cols = g.columns(p);
+    let check = |k: &ColKind| matches!(k, ColKind::Choice(o) if o.len() == 2 && o[0].is_empty() && o[1] == "yes");
+    // Colour columns become the row tint; the group column the section title.
+    let shown: Vec<usize> = (0..cols.len()).filter(|c| cols[*c].kind != ColKind::Color && Some(*c) != group).collect();
+    let head: Vec<&str> = shown.iter().map(|c| cols[*c].title.as_str()).collect();
+    let widths: Vec<Value> = shown
+        .iter()
+        .map(|c| {
+            let w = cols[*c].width;
+            if w >= 120.0 || matches!(cols[*c].kind, ColKind::Text) && w >= 100.0 {
+                json!((w / 100.0 * 10.0).round() / 10.0)
+            } else {
+                json!(0)
+            }
+        })
+        .collect();
+    // Without any wide column the table would not fill the page.
+    let widths = if widths.iter().all(|w| w == &json!(0)) {
+        let mut w = widths;
+        if let Some(i) = shown.iter().position(|c| matches!(cols[*c].kind, ColKind::Text)) {
+            w[i] = json!(1);
+        }
+        w
+    } else {
+        widths
+    };
+    let mut groups: Vec<(String, Vec<Value>)> = Vec::new();
+    for row in 0..g.len(p) {
+        let cells: Vec<String> = shown
+            .iter()
+            .map(|c| {
+                let t = g.text(p, row, *c);
+                if check(&cols[*c].kind) {
+                    (if t.is_empty() { UNCHECKED } else { CHECKED }).to_string()
+                } else {
+                    t
+                }
+            })
+            .collect();
+        let key = group.map(|c| g.text(p, row, c)).unwrap_or_default();
+        let r = colored(cells, false, &g.color(p, row));
+        match groups.iter_mut().find(|x| x.0 == key) {
+            Some(x) => x.1.push(r),
+            None => groups.push((key, vec![r])),
+        }
+    }
+    if groups.is_empty() {
+        groups.push((String::new(), Vec::new()));
+    }
+    let many = groups.len() > 1;
+    groups
+        .into_iter()
+        .map(|(key, rows)| {
+            let t = match (title.is_empty(), key.is_empty()) {
+                (_, false) => key,
+                (false, true) if many => format!("{title}: other"),
+                (false, true) => title.to_string(),
+                (true, true) if many => "Other".into(),
+                (true, true) => String::new(),
+            };
+            json!({ "title": t, "head": head, "widths": widths, "rows": rows })
+        })
+        .collect()
+}
+
+fn plan(p: &Project, id: Id, opts: &Options) -> Value {
+    use bp_core::plan_grid::Part;
+    use bp_core::plans::PlanKind;
+    let Some(plan) = p.plan(id) else { return Value::Null };
+    let mut d = json!({
+        "title": if plan.name.trim().is_empty() { plan.kind.plan_type().label().to_string() } else { plan.name.clone() },
+        "subtitle": "",
+        "revision": format!("Printed {}", today()),
+        "paper": opts.paper_name(),
+        "landscape": opts.landscape,
+        "theme": opts.theme_name(),
+        "legend": "",
+        "notes": plan.notes,
+        "meta": {
+            "production": p.meta.production,
+            "company": p.meta.company,
+            "venue": p.meta.venue,
+            "dates": p.meta.dates,
+        },
+        "kind": "table",
+        "sections": [],
+    });
+    match &plan.kind {
+        PlanKind::StagePlot(s) => {
+            let items: Vec<Value> = s
+                .items
+                .iter()
+                .filter(|i| !i.inputs.is_empty())
+                .map(|i| {
+                    let names: Vec<String> = i
+                        .inputs
+                        .iter()
+                        .filter_map(|x| p.patch.inputs.iter().find(|y| y.id == *x))
+                        .map(|x| format!("{} {}", x.no, x.name))
+                        .collect();
+                    json!({ "ch": bp_core::stage::channels(p, i), "what": bp_core::stage::item_text(p, i), "inputs": names.join(", ") })
+                })
+                .collect();
+            d["kind"] = json!("stage");
+            d["stage"] = json!({
+                "width": s.width,
+                "depth": s.depth,
+                "grid": s.grid,
+                "show_grid": s.show_grid,
+                "front": s.front,
+                "shapes": bp_core::stage::plot_shapes(p, s),
+                "items": items,
+                "size": format!("Stage {} x {} m · grid {} m", format_number(s.width), format_number(s.depth), format_number(s.grid)),
+            });
+        }
+        PlanKind::RunOfShow(r) => {
+            d["subtitle"] = json!(r.date);
+            d["sections"] = json!(plan_sections(p, id, Part::Run, "", None));
+        }
+        PlanKind::Contacts(_) => d["sections"] = json!(plan_sections(p, id, Part::Contacts, "", Some(2))),
+        PlanKind::Packlist(k) => {
+            let packed = k.rows.iter().filter(|r| r.packed).count();
+            d["subtitle"] = json!(format!("{packed} of {} packed", k.rows.len()));
+            d["sections"] = json!(plan_sections(p, id, Part::Pack, "", Some(0)));
+        }
+        PlanKind::Intercom(_) => {
+            let mut s = plan_sections(p, id, Part::IcPeople, "People", None);
+            s.extend(plan_sections(p, id, Part::IcChannels, "Channels", None));
+            d["sections"] = json!(s);
+            d["legend"] = json!("Talk: talks and listens on the channel. Listen: listens only.");
+        }
+        PlanKind::Table(_) => d["sections"] = json!(plan_sections(p, id, Part::Rows, "", None)),
+    }
+    d
 }

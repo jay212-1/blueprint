@@ -182,3 +182,35 @@ fn patch_prints() {
     let l = build(&p, Doc::Labels, &Options::for_doc(Doc::Labels));
     assert_eq!(l.get()["strips"].as_array().unwrap().len(), 5, "FOH, MON, REC, SB1, SB2");
 }
+
+#[test]
+fn every_plan_prints_in_every_theme() {
+    let p = bp_core::demo::band();
+    assert_eq!(p.plans.len(), 6, "one of each kind");
+    for plan in &p.plans {
+        let doc = Doc::Plan(plan.id);
+        for theme in [Theme::Stage, Theme::Technical, Theme::Ink] {
+            let opts = Options { theme, ..bp_print::options_for(&p, doc) };
+            let printed = print(&p, doc, &opts).unwrap_or_else(|e| panic!("{}: {e}", plan.name));
+            assert!(printed.pages() >= 1);
+            out(&format!("Plan-{}-{theme:?}", plan.name.replace([' ', '/'], "-")), &printed);
+        }
+    }
+    let stage = &p.plans[0];
+    assert!(bp_print::options_for(&p, Doc::Plan(stage.id)).landscape);
+    let d = build(&p, Doc::Plan(stage.id), &bp_print::options_for(&p, Doc::Plan(stage.id)));
+    assert_eq!(d.get()["kind"], "stage");
+    assert!(d.get()["stage"]["shapes"].as_array().unwrap().len() > 50);
+    let items = d.get()["stage"]["items"].as_array().unwrap();
+    assert!(items.iter().any(|i| i["ch"] == "1, 2, 3, 4, 5, 6, 7"), "{items:?}");
+    // The guest list: the check box column prints as a box.
+    let guests = p.plans.iter().find(|x| x.name == "Guest list").unwrap();
+    let d = build(&p, Doc::Plan(guests.id), &bp_print::options_for(&p, Doc::Plan(guests.id)));
+    let row = &d.get()["sections"][0]["rows"][0]["cells"];
+    assert_eq!(row[4], "\u{1}check:1");
+    // Contacts come in groups.
+    let c = p.plans.iter().find(|x| x.kind.plan_type() == bp_core::plans::PlanType::Contacts).unwrap();
+    let d = build(&p, Doc::Plan(c.id), &bp_print::options_for(&p, Doc::Plan(c.id)));
+    let titles: Vec<&str> = d.get()["sections"].as_array().unwrap().iter().map(|s| s["title"].as_str().unwrap()).collect();
+    assert_eq!(titles, ["Band", "Crew", "Venue", "Promoter"]);
+}

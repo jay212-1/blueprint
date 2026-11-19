@@ -269,7 +269,7 @@ fn text_field(
 
 /// A text field that hands back its text once it is left (Enter, Tab or a
 /// click elsewhere) and changed; it shows `shown` otherwise.
-fn parsed_field(ui: &mut egui::Ui, salt: (&str, Id), shown: &str, hint: &str) -> Option<String> {
+pub(crate) fn parsed_field(ui: &mut egui::Ui, salt: (&str, Id), shown: &str, hint: &str) -> Option<String> {
     let key = egui::Id::unique(salt).with("buffer");
     let mut buf: String = ui.data(|d| d.get_temp(key)).unwrap_or_else(|| shown.to_string());
     let r = ui.add(egui::TextEdit::singleline(&mut buf).hint_text(hint).desired_width(220.0).id_salt(salt));

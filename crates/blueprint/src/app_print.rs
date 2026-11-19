@@ -37,8 +37,8 @@ impl Default for PrintState {
 }
 
 impl PrintState {
-    pub fn options(&self, doc: Doc) -> Options {
-        self.opts.get(&doc).copied().unwrap_or_else(|| Options::for_doc(doc))
+    pub fn options(&self, p: &bp_core::model::Project, doc: Doc) -> Options {
+        self.opts.get(&doc).copied().unwrap_or_else(|| bp_print::options_for(p, doc))
     }
 }
 
@@ -64,6 +64,20 @@ impl App {
                 self.print.doc = Doc::MicPlot;
             }
         }
+        if let Doc::Plan(id) = self.print.doc {
+            if doc.project.plan(id).is_none() {
+                self.print.doc = Doc::MicPlot;
+            }
+        }
+        let plans: Vec<(Id, String, bool)> = doc
+            .project
+            .plans
+            .iter()
+            .map(|p| {
+                let name = if p.name.trim().is_empty() { p.kind.plan_type().label().to_string() } else { p.name.clone() };
+                (p.id, name, matches!(p.kind, bp_core::plans::PlanKind::StagePlot(_)))
+            })
+            .collect();
         let lists: Vec<(Id, String)> = doc
             .project
             .setlists
@@ -71,7 +85,7 @@ impl App {
             .map(|s| (s.id, if s.name.trim().is_empty() { "Untitled setlist".into() } else { s.name.clone() }))
             .collect();
         let current = self.print.doc;
-        let mut opts = self.print.options(current);
+        let mut opts = self.print.options(&doc.project, current);
         let mut pick = current;
 
         egui::Panel::left("print_options")
@@ -107,6 +121,19 @@ impl App {
                     }
                     for (id, name) in &lists {
                         let d = Doc::Setlist(*id);
+                        if ui
+                            .add(egui::Button::selectable(pick == d, name.as_str()).min_size(egui::vec2(ui.available_width(), 26.0)))
+                            .clicked()
+                        {
+                            pick = d;
+                        }
+                    }
+                    if !plans.is_empty() {
+                        ui.add_space(6.0);
+                        ui.label(RichText::new("MORE PLANS").small().color(theme::MUTED));
+                    }
+                    for (id, name, _) in &plans {
+                        let d = Doc::Plan(*id);
                         if ui
                             .add(egui::Button::selectable(pick == d, name.as_str()).min_size(egui::vec2(ui.available_width(), 26.0)))
                             .clicked()
@@ -153,12 +180,23 @@ impl App {
                             self.export_pdf(pick, &path);
                         }
                     }
+                    let stage = matches!(pick, Doc::Plan(id) if plans.iter().any(|p| p.0 == id && p.2));
+                    if stage
+                        && ui
+                            .add_sized([ui.available_width(), 28.0], egui::Button::new("Export PNG…"))
+                            .on_hover_text("The first page as an image (300 dpi), e.g. for a rider or an email")
+                            .clicked()
+                    {
+                        if let Some(path) = self.pick_png(pick) {
+                            self.export_png(pick, &path);
+                        }
+                    }
                 });
             });
 
         if pick != current {
             self.print.doc = pick;
-            opts = self.print.options(pick);
+            opts = self.doc.as_ref().map_or(opts, |d| self.print.options(&d.project, pick));
         }
         self.print.opts.insert(pick, opts);
 
@@ -298,6 +336,40 @@ impl App {
         d.save_file().map(|p| if p.extension().is_none() { p.with_extension("pdf") } else { p })
     }
 
+    fn pick_png(&self, doc: Doc) -> Option<PathBuf> {
+        if !self.dialogs {
+            return None;
+        }
+        let name = self.doc.as_ref().map(|d| d.title()).unwrap_or_else(|| "Untitled".into());
+        let mut d = rfd::FileDialog::new()
+            .set_title("Export PNG")
+            .add_filter("PNG image", &["png"])
+            .set_file_name(format!("{name} - {}.png", self.doc_name(doc)));
+        if let Some(dir) = &self.settings.last_dir {
+            d = d.set_directory(dir);
+        }
+        d.save_file().map(|p| if p.extension().is_none() { p.with_extension("png") } else { p })
+    }
+
+    /// Lay out `doc` and write its first page as a PNG (300 dpi). True when written.
+    pub fn export_png(&mut self, doc: Doc, path: &Path) -> bool {
+        let Some(d) = self.doc.as_ref() else { return false };
+        let opts = self.print.options(&d.project, doc);
+        let r = bp_print::print(&d.project, doc, &opts)
+            .and_then(|p| p.png(0, 300.0 / 72.0).ok_or_else(|| "the page could not be drawn".to_string()))
+            .and_then(|png| bp_core::project::atomic_write(path, &png).map_err(|e| e.to_string()));
+        match r {
+            Ok(()) => {
+                self.notify(format!("Exported {}", path.display()), false);
+                true
+            }
+            Err(e) => {
+                self.notify(format!("Could not export the image: {e}"), true);
+                false
+            }
+        }
+    }
+
     /// The document's name for file names ("Mic plot", the setlist's name).
     fn doc_name(&self, doc: Doc) -> String {
         match doc {
@@ -308,6 +380,12 @@ impl App {
                 .map(|s| s.name.trim().to_string())
                 .filter(|n| !n.is_empty())
                 .unwrap_or_else(|| "Setlist".into()),
+            Doc::Plan(id) => self
+                .doc
+                .as_ref()
+                .and_then(|d| d.project.plan(id))
+                .map(|p| if p.name.trim().is_empty() { p.kind.plan_type().label().to_string() } else { p.name.trim().to_string() })
+                .unwrap_or_else(|| "Plan".into()),
             _ => doc.title().into(),
         }
     }
@@ -315,7 +393,7 @@ impl App {
     /// Lay out `doc` and write the PDF. True when written.
     pub fn export_pdf(&mut self, doc: Doc, path: &Path) -> bool {
         let Some(d) = self.doc.as_ref() else { return false };
-        let opts = self.print.options(doc);
+        let opts = self.print.options(&d.project, doc);
         let r = bp_print::print(&d.project, doc, &opts)
             .and_then(|p| p.pdf())
             .and_then(|pdf| bp_core::project::atomic_write(path, &pdf).map_err(|e| e.to_string()));

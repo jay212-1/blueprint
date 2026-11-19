@@ -451,3 +451,99 @@ fn choice_menu_button_stays_when_the_pointer_moves_onto_it() {
     settle(&mut h);
     assert_eq!(project(&h).patch.inputs[3].stand, bp_core::patch::Stand::Tall);
 }
+
+#[test]
+fn stage_plot_editor() {
+    use bp_core::plans::PlanKind;
+    let mut h = harness();
+    h.get_by_label_contains("demo band show").click();
+    settle(&mut h);
+    // The nav is taller than the test window: go there directly.
+    let plan = project(&h).plans[0].id;
+    h.state_mut().page = Page::Plan(plan);
+    settle(&mut h);
+    assert_eq!(h.state().page, Page::Plan(plan));
+    shot(&mut h, "plan-stage");
+    let item = |h: &Harness<'static, App>, label: &str| {
+        let PlanKind::StagePlot(s) = &project(h).plans[0].kind else { panic!() };
+        s.items.iter().find(|i| i.label == label).cloned()
+    };
+    let spare = item(&h, "Spare vox").unwrap();
+    let (origin, scale) = h.state().stage.view.unwrap();
+    let at = |x: f64, y: f64| egui::pos2(origin.x + x as f32 * scale, origin.y + y as f32 * scale);
+    // Drag the spare vocal one metre (and a bit) to the left: it snaps to the grid.
+    let from = at(spare.x, spare.y);
+    let to = at(spare.x - 1.1, spare.y);
+    h.input_mut().events.push(Event::PointerMoved(from));
+    h.step();
+    h.input_mut().events.push(Event::PointerButton { pos: from, button: egui::PointerButton::Primary, pressed: true, modifiers: Modifiers::NONE });
+    h.step();
+    for k in 1..=6 {
+        let t = k as f32 / 6.0;
+        h.input_mut().events.push(Event::PointerMoved(from + (to - from) * t));
+        h.step();
+    }
+    h.input_mut().events.push(Event::PointerButton { pos: to, button: egui::PointerButton::Primary, pressed: false, modifiers: Modifiers::NONE });
+    settle(&mut h);
+    let moved = item(&h, "Spare vox").unwrap();
+    assert!((moved.x - 9.5).abs() < 1e-6, "10.6 - 1.1 snapped to 0.5 m: {}", moved.x);
+    assert!((moved.y - 6.5).abs() < 1e-6, "y snapped too: {}", moved.y);
+    assert_eq!(h.state().stage.selected, Some((plan, spare.id)));
+    shot(&mut h, "plan-stage-selected");
+    // R turns it, Delete removes it, undo brings it back.
+    key(&mut h, Key::R, Modifiers::NONE);
+    assert_eq!(item(&h, "Spare vox").unwrap().rot, 90.0);
+    key(&mut h, Key::Delete, Modifiers::NONE);
+    assert!(item(&h, "Spare vox").is_none());
+    key(&mut h, Key::Z, Modifiers::COMMAND);
+    settle(&mut h);
+    assert!(item(&h, "Spare vox").is_some());
+    // A new symbol from the palette is selected at once.
+    h.get_by_label("Chair").click();
+    settle(&mut h);
+    let PlanKind::StagePlot(s) = &project(&h).plans[0].kind else { panic!() };
+    let chair = s.items.last().unwrap();
+    assert_eq!(chair.symbol, bp_core::stage::Symbol::Chair);
+    assert_eq!(h.state().stage.selected, Some((plan, chair.id)));
+
+    // Print it, and as a picture.
+    h.get_by_label("Print…").click();
+    settle(&mut h);
+    assert_eq!(h.state().print.doc, bp_print::Doc::Plan(plan));
+    h.get_by_label_contains("page").hover();
+    shot(&mut h, "print-stage");
+    let dir = tempfile::tempdir().unwrap();
+    let png = dir.path().join("stage.png");
+    assert!(h.state_mut().export_png(bp_print::Doc::Plan(plan), &png));
+    assert!(std::fs::read(&png).unwrap().starts_with(b"\x89PNG"));
+}
+
+#[test]
+fn other_plans() {
+    let mut h = harness();
+    h.get_by_label_contains("demo band show").click();
+    settle(&mut h);
+    let plans: Vec<(bp_core::model::Id, String)> = project(&h).plans.iter().map(|p| (p.id, p.name.clone())).collect();
+    for (id, name) in &plans[1..] {
+        h.state_mut().page = Page::Plan(*id);
+        settle(&mut h);
+        shot(&mut h, &format!("plan-{}", name.replace([' ', '/'], "-")));
+    }
+    // The intercom's other table.
+    h.state_mut().page = Page::Plan(plans[4].0);
+    settle(&mut h);
+    h.get_by_label("Channels").click();
+    settle(&mut h);
+    shot(&mut h, "plan-intercom-channels");
+    // A new plan.
+    h.state_mut().new_plan(bp_core::plans::PlanType::RunOfShow);
+    settle(&mut h);
+    let n = project(&h).plans.len();
+    assert_eq!(n, 7);
+    let id = project(&h).plans[n - 1].id;
+    assert_eq!(h.state().page, Page::Plan(id));
+    h.get_by_label("Delete plan").click();
+    settle(&mut h);
+    assert_eq!(project(&h).plans.len(), 6);
+    assert_eq!(h.state().page, Page::Production);
+}

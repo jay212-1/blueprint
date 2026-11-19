@@ -2,6 +2,11 @@
 
 ## 0.1.0
 
+- More plans (M5): stage plot (symbol library, grid, snap, drag, turn, inputs linked to the patch with
+  channel badges, PNG export), run of show (times follow on), contacts (add the cast), packing list
+  (counted from patch and mic plan, packed marks kept), intercom / radio (channels, who talks or
+  listens), free tables (Text, Number, Time, Duration, Check box, Choice, Colour columns). Every plan
+  prints in the three themes; the band demo has one of each.
 - First version: the groundwork. Start page (new, open, recent, recovery of an unsaved project),
   navigation for the production data, master data and (later) the plans.
 - Project file `.blueprint` (JSON with a schema version), atomic saving with backups, autosave every

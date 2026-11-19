@@ -382,6 +382,7 @@ pub fn band() -> Project {
         ],
     );
     band_patch(&mut p);
+    band_plans(&mut p);
     p
 }
 
@@ -552,6 +553,240 @@ fn band_patch(p: &mut Project) {
         b.device = None;
         b.port = None;
         b.cable = "AES 30 m".into();
+    }
+}
+
+/// The band's other plans: stage plot (linked to the inputs), the day's
+/// schedule, contacts, packing list, intercom and a guest list.
+fn band_plans(p: &mut Project) {
+    use crate::plans::*;
+    use crate::stage::{StageItem, StagePlot, Symbol};
+    use crate::time::parse_clock;
+    let ch = |p: &Project, nos: &[u32]| -> Vec<Id> { nos.iter().filter_map(|n| p.patch.inputs.iter().find(|i| i.no == *n).map(|i| i.id)).collect() };
+
+    // Stage plot: 12 x 8 m, audience at the bottom.
+    let id = p.add_plan(PlanType::StagePlot);
+    // Symbol, x, y, turn, label, channels, colour.
+    type ItemRow<'a> = (Symbol, f64, f64, f64, &'a str, &'a [u32], &'a str);
+    let rows: [ItemRow; 30] = [
+        (Symbol::Riser, 6.0, 2.0, 0.0, "", &[], ""),
+        (Symbol::Drums, 6.0, 1.8, 0.0, "Drums", &[1, 2, 3, 4, 5, 6, 7], "red"),
+        (Symbol::MicStand, 4.9, 1.3, 0.0, "OH L", &[8], "red"),
+        (Symbol::MicStand, 7.1, 1.3, 0.0, "OH R", &[9], "red"),
+        (Symbol::DiBox, 7.9, 3.4, 0.0, "Playback", &[19, 20, 21], "orange"),
+        (Symbol::Speaker, 8.1, 1.0, 0.0, "Drum fill", &[], ""),
+        (Symbol::BassAmp, 9.3, 1.6, 0.0, "Bass amp", &[11], "blue"),
+        (Symbol::DiBox, 9.3, 2.6, 0.0, "", &[10], "blue"),
+        (Symbol::Person, 9.3, 4.2, 0.0, "Yusuf (bass)", &[], ""),
+        (Symbol::Wedge, 9.3, 5.4, 180.0, "Wedge Yusuf", &[], ""),
+        (Symbol::GuitarAmp, 3.2, 1.2, 0.0, "Guitar amp", &[12, 13], "green"),
+        (Symbol::Person, 3.4, 4.4, 0.0, "Malte (guitar)", &[], ""),
+        (Symbol::MicStand, 3.4, 5.4, 0.0, "", &[23], "green"),
+        (Symbol::Wedge, 3.4, 6.6, 0.0, "Wedge Malte", &[], ""),
+        (Symbol::Keys, 1.4, 3.6, 90.0, "Keys", &[15, 16, 17, 18], "purple"),
+        (Symbol::Person, 2.3, 3.6, 0.0, "Carla", &[], ""),
+        (Symbol::MicStand, 2.3, 4.6, 0.0, "", &[24], "purple"),
+        (Symbol::Person, 6.0, 5.0, 0.0, "Ida", &[], ""),
+        (Symbol::MicStand, 6.0, 6.0, 0.0, "", &[22], "yellow"),
+        (Symbol::DiBox, 7.0, 6.0, 0.0, "", &[14], "yellow"),
+        (Symbol::MicStand, 10.6, 6.6, 0.0, "Spare vox", &[25], ""),
+        (Symbol::Speaker, 0.5, 5.0, 90.0, "Sidefill L", &[], ""),
+        (Symbol::Speaker, 11.5, 5.0, 270.0, "Sidefill R", &[], ""),
+        (Symbol::Stagebox, 4.6, 3.0, 0.0, "SB1", &[], ""),
+        (Symbol::Stagebox, 11.2, 3.0, 0.0, "SB2", &[], ""),
+        (Symbol::Power, 6.0, 3.3, 0.0, "", &[], ""),
+        (Symbol::Power, 10.2, 2.4, 0.0, "", &[], ""),
+        (Symbol::Power, 1.6, 1.4, 0.0, "", &[], ""),
+        (Symbol::Iem, 11.2, 0.8, 0.0, "IEM rack", &[], ""),
+        (Symbol::Label, 11.0, 0.2, 0.0, "MON", &[], ""),
+    ];
+    let mut items = Vec::new();
+    for (sym, x, y, rot, label, nos, color) in rows {
+        let mut it = StageItem::new(p.alloc_id(), sym, x, y);
+        it.rot = rot;
+        it.label = label.into();
+        it.inputs = ch(p, nos);
+        it.color = color.into();
+        if sym == Symbol::Riser {
+            (it.w, it.d) = (3.0, 2.0);
+        }
+        items.push(it);
+    }
+    if let Some(plan) = p.plan_mut(id) {
+        plan.notes = "Drum riser 3 x 2 m, 40 cm high, carpeted. Power: 230 V Schuko, separate circuit for backline.".into();
+        plan.kind = PlanKind::StagePlot(StagePlot { width: 12.0, depth: 8.0, items, ..StagePlot::default() });
+    }
+
+    // Run of show.
+    let id = p.add_plan(PlanType::RunOfShow);
+    p.rename_plan(id, "Show day");
+    // Start, length (min), what, who, where, cue, notes, colour.
+    type CueRow<'a> = (&'a str, f64, &'a str, &'a str, &'a str, &'a str, &'a str, &'a str);
+    let cues: [CueRow; 13] = [
+        ("10:00", 90.0, "Load in", "All crew", "Loading dock", "", "Truck at dock 2", ""),
+        ("", 90.0, "PA and backline up", "Sound, backline", "Stage", "", "", ""),
+        ("13:00", 60.0, "Lunch", "Crew", "Catering", "", "", "green"),
+        ("14:00", 45.0, "Line check", "FOH, MON, backline", "Stage", "", "Inputs 1–26", ""),
+        ("", 75.0, "Soundcheck", "Band", "Stage", "", "Start with Small Hours", "blue"),
+        ("16:00", 30.0, "Support soundcheck", "Support band", "Stage", "", "", ""),
+        ("17:30", 60.0, "Dinner", "Band and crew", "Catering", "", "", "green"),
+        ("19:00", 30.0, "Doors", "Venue", "Foyer", "Walk-in music", "", "yellow"),
+        ("19:30", 35.0, "Support", "Support band", "Stage", "", "", ""),
+        ("", 25.0, "Changeover", "Backline", "Stage", "Walk-in music", "", ""),
+        ("20:30", 95.0, "Northbound Static", "Band", "Stage", "Intro from playback", "Encore in the set", "orange"),
+        ("", 15.0, "Walk-out", "Venue", "", "Outro music, house lights", "", ""),
+        ("23:00", 90.0, "Load out", "All crew", "Loading dock", "", "Curfew 23:30 for noise", ""),
+    ];
+    let rows: Vec<Cue> = cues
+        .iter()
+        .map(|(start, len, what, who, at, cue, notes, color)| Cue {
+            id: p.alloc_id(),
+            start: parse_clock(start),
+            duration: Some(len * 60.0),
+            what: (*what).into(),
+            who: (*who).into(),
+            location: (*at).into(),
+            cue: (*cue).into(),
+            notes: (*notes).into(),
+            color: (*color).into(),
+        })
+        .collect();
+    if let Some(PlanKind::RunOfShow(r)) = p.plan_mut(id).map(|x| &mut x.kind) {
+        r.date = "Saturday, Kulturhalle".into();
+        r.rows = rows;
+    }
+
+    // Contacts: the band and the crew (invented, numbers are not real).
+    let id = p.add_plan(PlanType::Contacts);
+    add_cast(p, id);
+    // Name, function, group, company, phone, email.
+    let crew: [(&str, &str, &str, &str, &str, &str); 7] = [
+        ("Sanne Albers", "Tour manager", "Crew", "Northbound Static", "+49 151 0000 0101", "tm@example.com"),
+        ("Jonas Petrov", "FOH engineer", "Crew", "Northbound Static", "+49 151 0000 0102", "foh@example.com"),
+        ("Lea Kowalski", "Monitor engineer", "Crew", "Northbound Static", "+49 151 0000 0103", "mon@example.com"),
+        ("Bram de Wit", "Backline tech", "Crew", "Northbound Static", "+49 151 0000 0104", ""),
+        ("Nora Feld", "Production manager", "Venue", "Kulturhalle", "+49 30 0000 0201", "production@example.com"),
+        ("Timo Brandt", "House technician", "Venue", "Kulturhalle", "+49 30 0000 0202", ""),
+        ("Elif Aydin", "Promoter rep", "Promoter", "Static Shows", "+49 160 0000 0301", "promo@example.com"),
+    ];
+    let rows: Vec<Contact> = crew
+        .iter()
+        .map(|(name, function, group, company, phone, email)| Contact {
+            id: p.alloc_id(),
+            name: (*name).into(),
+            function: (*function).into(),
+            group: (*group).into(),
+            company: (*company).into(),
+            phone: (*phone).into(),
+            email: (*email).into(),
+            ..Contact::default()
+        })
+        .collect();
+    if let Some(PlanKind::Contacts(c)) = p.plan_mut(id).map(|x| &mut x.kind) {
+        for r in &mut c.rows {
+            r.group = "Band".into();
+            r.company = "Northbound Static".into();
+        }
+        c.rows.extend(rows);
+    }
+
+    // Packing list: counted from the patch, plus our own things.
+    let id = p.add_plan(PlanType::Packlist);
+    refresh_packlist(p, id);
+    let own: [(&str, &str, u32, &str); 5] = [
+        ("Consumables", "Gaffer tape, black", 6, "Workbox"),
+        ("Consumables", "Spare strings (guitar, bass)", 4, "Backline case"),
+        ("Consumables", "9 V batteries", 20, "Workbox"),
+        ("Paper", "Setlists, input lists, stage plots", 10, "Office case"),
+        ("Tools", "Drum key, multitool, torch", 1, "Workbox"),
+    ];
+    let rows: Vec<PackRow> = own
+        .iter()
+        .map(|(group, what, count, case)| PackRow { id: p.alloc_id(), group: (*group).into(), what: (*what).into(), count: *count, case: (*case).into(), ..PackRow::default() })
+        .collect();
+    if let Some(PlanKind::Packlist(k)) = p.plan_mut(id).map(|x| &mut x.kind) {
+        for (i, r) in k.rows.iter_mut().enumerate() {
+            r.packed = i % 3 != 2;
+            if r.case.is_empty() {
+                r.case = "Audio case".into();
+            }
+        }
+        k.rows.extend(rows);
+    }
+
+    // Intercom.
+    let id = p.add_plan(PlanType::Intercom);
+    let chans: [(&str, IcKind, &str, &str); 4] = [
+        ("Production", IcKind::Partyline, "A", "Everyone on headsets"),
+        ("Sound", IcKind::Partyline, "B", "FOH and monitors"),
+        ("Stage", IcKind::Wireless, "C", "Beltpacks on stage"),
+        ("Security", IcKind::Radio, "Ch 4", "Venue radios"),
+    ];
+    let channels: Vec<IcChannel> = chans
+        .iter()
+        .map(|(name, kind, no, notes)| IcChannel { id: p.alloc_id(), name: (*name).into(), kind: *kind, number: (*no).into(), notes: (*notes).into(), ..IcChannel::default() })
+        .collect();
+    let c: Vec<Id> = channels.iter().map(|x| x.id).collect();
+    use Access::{Listen, Talk};
+    // Name, position, device, group, access per channel.
+    type UserRow<'a> = (&'a str, &'a str, &'a str, &'a str, [Option<Access>; 4]);
+    let users: [UserRow; 7] = [
+        ("Sanne Albers", "Tour manager", "Beltpack wireless", "Band crew", [Some(Talk), None, Some(Talk), Some(Listen)]),
+        ("Jonas Petrov", "FOH", "Desk station", "Sound", [Some(Talk), Some(Talk), Some(Listen), None]),
+        ("Lea Kowalski", "Monitor world", "Desk station", "Sound", [Some(Talk), Some(Talk), Some(Talk), None]),
+        ("Bram de Wit", "Stage left", "Beltpack wireless", "Band crew", [Some(Listen), None, Some(Talk), None]),
+        ("Lighting", "FOH", "Beltpack wired", "Venue", [Some(Talk), None, Some(Listen), None]),
+        ("Timo Brandt", "Stage manager desk", "Beltpack wired", "Venue", [Some(Talk), Some(Listen), Some(Talk), Some(Talk)]),
+        ("Security lead", "Front of stage", "Radio", "Venue", [None, None, None, Some(Talk)]),
+    ];
+    let people: Vec<IcUser> = users
+        .iter()
+        .map(|(name, pos, dev, group, acc)| IcUser {
+            id: p.alloc_id(),
+            name: (*name).into(),
+            position: (*pos).into(),
+            device: (*dev).into(),
+            group: (*group).into(),
+            access: acc.iter().zip(&c).filter_map(|(a, ch)| a.map(|access| IcAccess { channel: *ch, access })).collect(),
+            ..IcUser::default()
+        })
+        .collect();
+    if let Some(PlanKind::Intercom(i)) = p.plan_mut(id).map(|x| &mut x.kind) {
+        i.channels = channels;
+        i.people = people;
+    }
+
+    // A free table: the guest list.
+    let id = p.add_plan(PlanType::Table);
+    p.rename_plan(id, "Guest list");
+    let cols: Vec<FreeCol> = [
+        ("Name", FreeKind::Text, "", 180.0),
+        ("Guests", FreeKind::Number, "", 60.0),
+        ("Pass", FreeKind::Choice, "AAA, Guest, Photo", 80.0),
+        ("Via", FreeKind::Text, "", 140.0),
+        ("Picked up", FreeKind::Check, "", 70.0),
+    ]
+    .iter()
+    .map(|(name, kind, options, width)| FreeCol { id: p.alloc_id(), name: (*name).into(), kind: *kind, options: (*options).into(), width: *width })
+    .collect();
+    let guests: [[&str; 5]; 5] = [
+        ["Mara Lindqvist", "2", "Guest", "Ida", "yes"],
+        ["Ole Brenner", "1", "Photo", "Promoter", ""],
+        ["Family Jansen", "4", "Guest", "Henrik", "yes"],
+        ["Radio North", "2", "AAA", "Label", ""],
+        ["Pia Sommer", "1", "Guest", "Malte", ""],
+    ];
+    let mut rows = Vec::new();
+    for g in guests {
+        let mut r = FreeRow { id: p.alloc_id(), cells: Vec::new() };
+        for (c, v) in cols.iter().zip(g) {
+            r.put(c.id, v.into());
+        }
+        rows.push(r);
+    }
+    if let Some(PlanKind::Table(t)) = p.plan_mut(id).map(|x| &mut x.kind) {
+        t.columns = cols;
+        t.rows = rows;
     }
 }
 

@@ -30,6 +30,8 @@ pub enum Doc {
     Labels,
     /// One setlist (by id).
     Setlist(bp_core::model::Id),
+    /// One of the other plans (by id).
+    Plan(bp_core::model::Id),
 }
 
 impl Doc {
@@ -68,6 +70,7 @@ impl Doc {
             Doc::PackList => "Cables and stands",
             Doc::Labels => "Labels and scribble strips",
             Doc::Setlist(_) => "Setlist",
+            Doc::Plan(_) => "Plan",
         }
     }
 
@@ -82,6 +85,7 @@ impl Doc {
             Doc::MicCards => "mic-cards.typ",
             Doc::Setlist(_) => "setlist.typ",
             Doc::Labels => "labels.typ",
+            Doc::Plan(_) => "plan.typ",
             _ => "table.typ",
         }
     }
@@ -201,6 +205,23 @@ pub struct Options {
     pub mark_changes: bool,
 }
 
+/// The options a document starts with in this project (stage plots, intercom
+/// matrices and wide free tables are landscape).
+pub fn options_for(p: &bp_core::model::Project, doc: Doc) -> Options {
+    use bp_core::plans::PlanKind;
+    let mut o = Options::for_doc(doc);
+    if let Doc::Plan(id) = doc {
+        o.landscape = match p.plan(id).map(|x| &x.kind) {
+            Some(PlanKind::StagePlot(_)) => true,
+            Some(PlanKind::Intercom(i)) => i.channels.len() > 4,
+            Some(PlanKind::Table(t)) => t.columns.len() > 5,
+            Some(PlanKind::Contacts(_)) => true,
+            _ => false,
+        };
+    }
+    o
+}
+
 impl Options {
     pub fn for_doc(doc: Doc) -> Options {
         Options {
@@ -215,7 +236,8 @@ impl Options {
     }
 }
 
-const TEMPLATES: [(&str, &str); 6] = [
+const TEMPLATES: [(&str, &str); 7] = [
+    ("plan.typ", include_str!("../templates/plan.typ")),
     ("labels.typ", include_str!("../templates/labels.typ")),
     ("setlist.typ", include_str!("../templates/setlist.typ")),
     ("common.typ", include_str!("../templates/common.typ")),

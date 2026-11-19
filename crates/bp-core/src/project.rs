@@ -80,6 +80,8 @@ fn repair_ids(p: &mut Project) {
         .chain(p.patch.links.iter().map(|x| x.id))
         .chain(p.patch.inputs.iter().map(|x| x.id))
         .chain(p.patch.outputs.iter().map(|x| x.id))
+        .chain(p.plans.iter().map(|x| x.id))
+        .chain(p.plans.iter().flat_map(|x| x.kind.ids()))
         .max()
         .unwrap_or(0);
     p.next_id = p.next_id.max(max + 1);

@@ -4,6 +4,7 @@
 
 use crate::mic::MicPlan;
 use crate::patch::Patch;
+use crate::plans::Plan;
 use crate::setlist::{Setlist, Song};
 use serde::{Deserialize, Serialize};
 
@@ -33,6 +34,7 @@ pub struct Project {
     pub songs: Vec<Song>,
     pub setlists: Vec<Setlist>,
     pub patch: Patch,
+    pub plans: Vec<Plan>,
 }
 
 impl Default for Project {
@@ -51,6 +53,7 @@ impl Default for Project {
             songs: Vec::new(),
             setlists: Vec::new(),
             patch: Patch::default(),
+            plans: Vec::new(),
         }
     }
 }
@@ -112,6 +115,8 @@ impl Project {
         crate::setlist::prune(&mut self.setlists, &songs);
         let locations: Vec<Id> = self.locations.iter().map(|l| l.id).collect();
         self.patch.prune(&people, &locations);
+        let inputs: Vec<Id> = self.patch.inputs.iter().map(|i| i.id).collect();
+        crate::plans::prune(&mut self.plans, &inputs);
     }
 }
 
