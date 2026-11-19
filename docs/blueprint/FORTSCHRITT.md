@@ -69,7 +69,35 @@ Setliste duplizieren und kürzen; im Druck wird die Schrift größer.
 **Offen / bewusst später:** Import von Songlisten aus CSV/XLSX mit Spaltenzuordnung (M6),
 Verknüpfung von Songs mit Patch/Inputs (M4).
 
-## Als Nächstes: M4 – Patch
+## M4 – Patch (in 0.1.0, 2026-11-19) ✅
 
-Locations, Geräte mit Ports, Verbindungen (Multicore, Dante, AES50, MADI …), Input- und
-Output-Patch mit Splits und vollem Signalweg, Prüfungen, Kabel- und Stativliste, Etiketten.
+- Geräte pro Location (Stagebox, I/O-Rack, Pult, Splitter, Amp, Recorder, IEM) mit Port-Zahlen
+  und Steckertyp; Leitungen (Multicore, Dante, AES50, MADI, AVB, AES/EBU) mit Kanalzahl, Länge und
+  Kabelbezeichnung.
+- Input-Patch: Kanal, Name, Quelle, Mikro/DI, Stativ, 48V, Musiker:in, Stagebox/Port, Leitung und
+  Leitungskanal (automatisch aus Stagebox und Port), eine Spalte pro Pult/Recorder für Splits,
+  ganzer Signalweg in der letzten Spalte. Neue Zeilen zählen Kanal und Port weiter.
+- Output-Patch: Pult-Bus/Matrix → Leitung → Gerät/Port → Ziel (PA, Monitor, IEM, Recording,
+  Broadcast), für wen, Mix-Wünsche.
+- Prüfungen: Port/Pultkanal doppelt, Leitungskanal doppelt, Port-/Kanalzahl überschritten,
+  Leitung voll, Input ohne Pult, Output ohne Ziel, Kondensator ohne 48V. Unter „Checks“ mit Sprung.
+- Drucke: Input-Liste, Stagebox-Patch (eine Seite pro Box zum Ankleben), Output-Liste,
+  Monitor/IEM-Liste pro Musiker:in, Kabel- und Stativliste als Packliste, Scribble-Strips für die
+  Pulte und Port-Etiketten für die Stageboxen.
+- Demo-Band mit vollem Patch: 26 Inputs auf zwei Stageboxen (Multicore und Dante), Split auf FOH,
+  MON und REC, 12 Outputs mit Wedges und IEMs.
+- Tests: 43 Kern-Tests, 6 Druck-Tests, 12 UI-Tests.
+
+**Zum Testen:** Startseite › „Try the demo band show“ › PATCH › „Input patch“. Einen Port
+doppelt belegen (z. B. Snare top auf Port 1) und unter „Checks“ ansehen, Mikro „KM184“ eintippen
+(48V geht an), unter „Devices“ ein Gerät hinzufügen (neue Location wird angelegt), „Cables and
+stands“ ansehen, „Print / PDF“ › PATCH › alle sechs Drucke durchklicken.
+
+**Offen / bewusst später:** Verknüpfung Stageplot ↔ Inputs (M5), Packliste mit Ersatz und
+manuellen Posten (M5), Austauschformat für die Live-Tools (Kanalnamen, Patch, DCA) und Vorschlag
+für ein gemeinsames Crate (M6).
+
+## Als Nächstes: M5 – Sonstige Pläne
+
+Stageplot (Symbolbibliothek, Raster, Maßstab, Verknüpfung mit Inputs), Run of Show, Kontakte,
+Packliste, Intercom, freie Tabellen.

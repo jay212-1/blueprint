@@ -50,7 +50,8 @@ Showtime Suite installs, updates and starts the others; its catalog is `showtime
   casts of the day, swaps, DCAs, batteries) and `MicView`, which works out the matrix, swaps and
   problems; `mic_grid.rs` shows it as tables; `grid.rs` is the table interface all lists share;
   `demo.rs` the demo musical and the demo band show. `setlist.rs` – song library, setlists, times
-  (`timing`) and their tables.
+  (`timing`) and their tables. `patch.rs` – devices, lines, inputs with splits, outputs, signal
+  paths, checks, cable and stand list; `patch_grid.rs` its tables.
 - `crates/bp-print` – Typst printing: `templates/*.typ` (layout and themes, kept apart from the
   code; `setlist.typ` fits the type to one page), `fonts/` (OFL, embedded), `data.rs` (plans to JSON for the templates).
 - `crates/blueprint` – the egui app: `app.rs` (window, project actions), `app_*.rs` (pages),

@@ -9,6 +9,7 @@ use bp_core::model::Project;
 use bp_core::project;
 use bp_core::mic::MicView;
 use bp_core::mic_grid::MicSheet;
+use bp_core::patch_grid::PatchSheet;
 use bp_core::model::Id;
 use bp_core::sheet::Sheet;
 use egui::{Color32, Key, KeyboardShortcut, Modifiers, RichText, ViewportCommand};
@@ -28,6 +29,7 @@ pub enum Page {
     Print,
     Songs,
     Setlist(Id),
+    Patch(bp_core::patch_grid::PatchSheet),
 }
 
 /// What to do once unsaved changes are dealt with.
@@ -67,6 +69,7 @@ pub struct App {
     pub untitled_recovery: Option<Project>,
     /// The mic plan worked out for a document generation.
     pub(crate) mic_cache: Option<(u64, std::sync::Arc<MicView>)>,
+    pub(crate) patch_cache: Option<(u64, std::sync::Arc<Vec<bp_core::patch::PatchProblem>>)>,
     /// Transmitter out and spare chosen in the spare panel.
     pub(crate) spare_pick: (Option<Id>, Option<Id>),
     pub print: crate::app_print::PrintState,
@@ -89,6 +92,7 @@ impl App {
             window_title: String::new(),
             untitled_recovery,
             mic_cache: None,
+            patch_cache: None,
             spare_pick: (None, None),
             print: Default::default(),
         };
@@ -411,6 +415,7 @@ impl App {
                     Page::Print => self.print_page(ui),
                     Page::Songs => self.songs_page(ui),
                     Page::Setlist(id) => self.setlist_page(ui, id),
+                    Page::Patch(s) => self.patch_page(ui, s),
                 });
         }
         self.modals(&ctx);
@@ -484,8 +489,12 @@ impl App {
         for s in MicSheet::ALL {
             item(ui, Page::Mic(s), s.title().to_string());
         }
+        section(ui, "PATCH");
+        for s in PatchSheet::ALL {
+            item(ui, Page::Patch(s), s.title().to_string());
+        }
         section(ui, "");
-        let n = self.mic_view().problems.len();
+        let n = self.mic_view().problems.len() + self.patch_problems().len();
         let on = self.page == Page::Checks;
         let label = if n == 0 {
             RichText::new("Checks: all fine")
@@ -534,7 +543,7 @@ impl App {
             self.new_setlist();
         }
         section(ui, "MORE PLANS");
-        for p in ["Patch", "Stage plot", "Run of show", "More plans"] {
+        for p in ["Stage plot", "Run of show", "More plans"] {
             ui.add_enabled(false, egui::Button::selectable(false, p).min_size(egui::vec2(ui.available_width(), 26.0)))
                 .on_disabled_hover_text("Coming in a later version");
         }

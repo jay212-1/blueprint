@@ -16,8 +16,12 @@ fn out(name: &str, printed: &bp_print::Printed) {
 
 #[test]
 fn every_document_in_every_theme() {
-    let p = musical();
-    for doc in Doc::ALL {
+    let mut p = musical();
+    // The band's patch in the same project, so every print has something.
+    p.patch = bp_core::demo::band().patch;
+    p.locations = bp_core::demo::band().locations;
+    p.cast.extend(bp_core::demo::band().cast);
+    for doc in Doc::MIC.into_iter().chain(Doc::PATCH) {
         for theme in Theme::ALL {
             let opts = Options { theme, ..Options::for_doc(doc) };
             let printed = print(&p, doc, &opts).unwrap_or_else(|e| panic!("{doc:?} {theme:?}: {e}"));
@@ -151,4 +155,30 @@ fn a_setlist_with_a_logo() {
     // Something that is not a picture is left out instead of failing.
     p.setlists[0].set_logo(b"not an image");
     assert!(print(&p, doc, &Options::for_doc(doc)).is_ok());
+}
+
+#[test]
+fn patch_prints() {
+    let p = bp_core::demo::band();
+    for doc in Doc::PATCH {
+        let printed = print(&p, doc, &Options::for_doc(doc)).unwrap_or_else(|e| panic!("{doc:?}: {e}"));
+        out(&format!("Band-{doc:?}"), &printed);
+        if doc == Doc::StageboxPlan {
+            // One page per box with something plugged in (SB1, SB2, IEM rack).
+            assert_eq!(printed.pages(), 3);
+        }
+    }
+    let d = build(&p, Doc::InputList, &Options::for_doc(Doc::InputList));
+    let head = d.get()["head"].as_array().unwrap();
+    assert!(head.iter().any(|h| h == "MON") && head.iter().any(|h| h == "REC"));
+    let first = &d.get()["sections"][0]["rows"][0]["cells"];
+    assert_eq!(first[6], "SB1 / 1");
+    assert_eq!(first[7], "MC1 / 1");
+    assert_eq!(d.get()["revision"].as_str().unwrap().split(' ').next(), Some("Printed"));
+    let m = build(&p, Doc::MonitorList, &Options::for_doc(Doc::MonitorList));
+    let titles: Vec<&str> = m.get()["sections"].as_array().unwrap().iter().map(|s| s["title"].as_str().unwrap()).collect();
+    assert!(titles[0].starts_with("Ida Lorenz"), "{titles:?}");
+    assert_eq!(titles.last(), Some(&"Shared"));
+    let l = build(&p, Doc::Labels, &Options::for_doc(Doc::Labels));
+    assert_eq!(l.get()["strips"].as_array().unwrap().len(), 5, "FOH, MON, REC, SB1, SB2");
 }

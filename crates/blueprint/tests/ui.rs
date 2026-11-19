@@ -325,13 +325,13 @@ fn band_show_setlists() {
     assert_eq!(project(&h).songs.len(), songs);
 
     // The library shows where songs are used.
-    h.get_by_label_contains("Song library").click();
+    // (The nav is taller than the test window now: go there directly.)
+    h.state_mut().page = Page::Songs;
     settle(&mut h);
-    assert_eq!(h.state().page, Page::Songs);
     shot(&mut h, "song-library");
 
     // A new setlist, a logo, then the print preview.
-    h.get_by_label("+ New setlist").click();
+    h.state_mut().new_setlist();
     settle(&mut h);
     let p = project(&h);
     assert_eq!(p.setlists.len(), 3);
@@ -369,4 +369,52 @@ fn band_show_setlists() {
     assert_eq!(h.state().page, Page::Songs);
     key(&mut h, Key::Z, Modifiers::COMMAND);
     assert_eq!(project(&h).setlists.len(), 3);
+}
+
+#[test]
+fn patch_pages_and_checks() {
+    use bp_core::patch_grid::PatchSheet;
+    let mut h = harness();
+    h.get_by_label_contains("demo band show").click();
+    settle(&mut h);
+    h.get_by_label("Input patch").click();
+    settle(&mut h);
+    assert_eq!(h.state().page, Page::Patch(PatchSheet::Inputs));
+    shot(&mut h, "patch-inputs");
+
+    // Snare top (row 2) onto the kick's port: a clash, shown under Checks.
+    {
+        let st = h.state_mut().tables.entry("patch:Inputs".into()).or_default();
+        st.select(&[2]);
+        st.cursor = (2, 8);
+    }
+    settle(&mut h);
+    type_text(&mut h, "1");
+    key(&mut h, Key::Enter, Modifiers::NONE);
+    assert_eq!(project(&h).patch.inputs[2].port, Some(1));
+    h.get_by_label("Show checks").click();
+    settle(&mut h);
+    assert_eq!(h.state().page, Page::Checks);
+    h.get_by_label_contains("SB1 port 1 has two inputs").hover();
+    shot(&mut h, "patch-checks");
+    h.get_by_label("Show").click();
+    settle(&mut h);
+    assert_eq!(h.state().page, Page::Patch(PatchSheet::Inputs), "one problem: the port");
+    key(&mut h, Key::Z, Modifiers::COMMAND);
+    assert_eq!(project(&h).patch.inputs[2].port, Some(3));
+
+    for s in [PatchSheet::Outputs, PatchSheet::Devices, PatchSheet::Lines, PatchSheet::Pack] {
+        h.state_mut().page = Page::Patch(s);
+        settle(&mut h);
+        shot(&mut h, &format!("patch-{s:?}"));
+    }
+    h.state_mut().page = Page::Print;
+    settle(&mut h);
+    h.get_by_label("Stagebox patch").click();
+    settle(&mut h);
+    h.get_by_label_contains("page").hover();
+    shot(&mut h, "print-stagebox");
+    let dir = tempfile::tempdir().unwrap();
+    let pdf = dir.path().join("labels.pdf");
+    assert!(h.state_mut().export_pdf(bp_print::Doc::Labels, &pdf));
 }

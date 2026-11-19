@@ -4,6 +4,7 @@
 use crate::app::{App, Page};
 use crate::theme;
 use bp_core::mic::{replace_tx, tx_label, MicView, Problem};
+use bp_core::patch_grid::PatchSheet;
 use bp_core::mic_grid::{MicGrid, MicSheet};
 use bp_core::model::TxStatus;
 use egui::RichText;
@@ -244,16 +245,17 @@ impl App {
 
     pub(crate) fn checks_page(&mut self, ui: &mut egui::Ui) {
         let view = self.mic_view();
+        let patch = self.patch_problems();
         let Some(doc) = self.doc.as_ref() else { return };
         let p = &doc.project;
         ui.heading("Checks");
         ui.label(
-            RichText::new("Problems in the mic plan, worked out from the plan as it is now.")
+            RichText::new("Problems in the mic plan and the patch, worked out from the plans as they are now.")
                 .small()
                 .color(theme::MUTED),
         );
         ui.add_space(8.0);
-        if view.problems.is_empty() {
+        if view.problems.is_empty() && patch.is_empty() {
             ui.label(RichText::new("No problems found.").color(theme::OK));
             return;
         }
@@ -288,9 +290,36 @@ impl App {
                     let _ = i;
                 });
             }
+            for x in patch.iter() {
+                ui.horizontal(|ui| {
+                    use bp_core::patch::PatchProblem as P;
+                    let color = match x {
+                        P::NoPhantom { .. } | P::NoTarget { .. } => theme::WARN,
+                        _ => theme::ERROR,
+                    };
+                    let (r, _) = ui.allocate_exact_size(egui::vec2(10.0, 10.0), egui::Sense::hover());
+                    ui.painter().circle_filled(r.center(), 4.5, color);
+                    ui.label(RichText::new("Patch").small().color(theme::MUTED));
+                    ui.label(x.message(p));
+                    let (output, row) = x.place();
+                    let sheet = match (x, output) {
+                        (P::LineFull { .. }, _) => PatchSheet::Lines,
+                        (_, true) => PatchSheet::Outputs,
+                        _ => PatchSheet::Inputs,
+                    };
+                    if ui.small_button("Show").on_hover_text("Go to the place in the patch").clicked() {
+                        go = Some((Page::Patch(sheet), row, None));
+                    }
+                });
+            }
         });
         if let Some((page, row, col)) = go {
             self.page = page;
+            if let (Page::Patch(s), Some(row)) = (page, row) {
+                let st = self.tables.entry(format!("patch:{s:?}")).or_default();
+                st.select(&[row]);
+                st.cursor = (row, 1);
+            }
             if let (Page::Mic(MicSheet::Plot), Some(row)) = (page, row) {
                 let st = self.tables.entry(format!("mic:{:?}", MicSheet::Plot)).or_default();
                 st.select(&[row]);

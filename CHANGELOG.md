@@ -45,3 +45,20 @@
   the smallest size): themes Stage (big titles and keys for the floor), Technical / FOH (times,
   tempo, line-up, cues) and Elegant (serif, centred).
 - Demo band show "Northbound Static" (start page): 16 songs, a club show and a festival set.
+- Patch: devices at the locations (stageboxes, I/O racks, consoles, splitters, amps, recorders,
+  IEM transmitters) with their port counts and connectors, lines between them (multicore, Dante,
+  AES50, MADI, AVB, AES/EBU) with channel count and cable label.
+- Input patch: channel, name, source, mic or DI, stand, 48V, player, stagebox and port, line and
+  line channel (an analog multicore uses the port; a stagebox with one line uses it), one column
+  per desk and recorder for splits, and the whole signal path. New rows follow on from the row
+  above; known condenser mics switch 48V on.
+- Output patch: desk bus or matrix, line, device and port, where it goes (PA, monitor, IEM,
+  recording, broadcast), for whom and the mix notes.
+- Patch checks: a port or desk channel used twice, two signals on one line channel, a port, desk
+  channel or line channel above the count, a full line, an input that reaches no desk, an output
+  that goes nowhere, a condenser mic without 48V. Listed under Checks with the mic plan.
+- Patch prints: input list, a page per stagebox to tape on, output list, monitor / IEM list per
+  musician, cables and stands counted from the patch as a packing list, scribble strips for the
+  desks and port labels for the stageboxes.
+- The demo band show has a full patch: 26 inputs on two stageboxes, split to FOH, monitors and the
+  recording, 12 outputs.

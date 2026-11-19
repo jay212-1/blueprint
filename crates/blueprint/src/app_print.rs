@@ -79,69 +79,81 @@ impl App {
             .exact_size(270.0)
             .frame(egui::Frame::NONE.inner_margin(egui::Margin { left: 0, right: 14, top: 0, bottom: 0 }))
             .show(ui, |ui| {
-                ui.heading("Print");
-                ui.add_space(6.0);
-                ui.label(RichText::new("DOCUMENT").small().color(theme::MUTED));
-                for d in Doc::ALL {
-                    if ui
-                        .add(egui::Button::selectable(pick == d, d.title()).min_size(egui::vec2(ui.available_width(), 26.0)))
-                        .clicked()
-                    {
-                        pick = d;
-                    }
-                }
-                if !lists.is_empty() {
+                egui::ScrollArea::vertical().auto_shrink([false, false]).show(ui, |ui| {
+                    ui.heading("Print");
                     ui.add_space(6.0);
-                    ui.label(RichText::new("SETLISTS").small().color(theme::MUTED));
-                }
-                for (id, name) in &lists {
-                    let d = Doc::Setlist(*id);
-                    if ui
-                        .add(egui::Button::selectable(pick == d, name.as_str()).min_size(egui::vec2(ui.available_width(), 26.0)))
-                        .clicked()
-                    {
-                        pick = d;
+                    ui.label(RichText::new("MIC PLAN").small().color(theme::MUTED));
+                    for d in Doc::MIC {
+                        if ui
+                            .add(egui::Button::selectable(pick == d, d.title()).min_size(egui::vec2(ui.available_width(), 26.0)))
+                            .clicked()
+                        {
+                            pick = d;
+                        }
                     }
-                }
-                ui.add_space(10.0);
-                ui.label(RichText::new("PAGE").small().color(theme::MUTED));
-                ui.horizontal(|ui| {
-                    for p in Paper::ALL {
-                        ui.selectable_value(&mut opts.paper, p, p.label());
-                    }
-                });
-                ui.horizontal(|ui| {
-                    ui.selectable_value(&mut opts.landscape, false, "Portrait");
-                    ui.selectable_value(&mut opts.landscape, true, "Landscape");
-                });
-                ui.add_space(10.0);
-                ui.label(RichText::new("THEME").small().color(theme::MUTED));
-                for t in pick.themes() {
-                    ui.radio_value(&mut opts.theme, *t, t.label_for(pick)).on_hover_text(t.hint(pick));
-                }
-                if let Doc::Setlist(_) = pick {
-                    ui.label(
-                        RichText::new("The type is as large as fits on one page.").small().color(theme::MUTED),
-                    );
-                }
-                if pick == Doc::MicPlot {
                     ui.add_space(6.0);
-                    ui.checkbox(&mut opts.mark_changes, "Mark changes since the revision before");
-                }
-                if pick.has_revision() {
+                    ui.label(RichText::new("PATCH").small().color(theme::MUTED));
+                    for d in Doc::PATCH {
+                        if ui
+                            .add(egui::Button::selectable(pick == d, d.title()).min_size(egui::vec2(ui.available_width(), 26.0)))
+                            .clicked()
+                        {
+                            pick = d;
+                        }
+                    }
+                    if !lists.is_empty() {
+                        ui.add_space(6.0);
+                        ui.label(RichText::new("SETLISTS").small().color(theme::MUTED));
+                    }
+                    for (id, name) in &lists {
+                        let d = Doc::Setlist(*id);
+                        if ui
+                            .add(egui::Button::selectable(pick == d, name.as_str()).min_size(egui::vec2(ui.available_width(), 26.0)))
+                            .clicked()
+                        {
+                            pick = d;
+                        }
+                    }
+                    ui.add_space(10.0);
+                    ui.label(RichText::new("PAGE").small().color(theme::MUTED));
+                    ui.horizontal(|ui| {
+                        for p in Paper::ALL {
+                            ui.selectable_value(&mut opts.paper, p, p.label());
+                        }
+                    });
+                    ui.horizontal(|ui| {
+                        ui.selectable_value(&mut opts.landscape, false, "Portrait");
+                        ui.selectable_value(&mut opts.landscape, true, "Landscape");
+                    });
+                    ui.add_space(10.0);
+                    ui.label(RichText::new("THEME").small().color(theme::MUTED));
+                    for t in pick.themes() {
+                        ui.radio_value(&mut opts.theme, *t, t.label_for(pick)).on_hover_text(t.hint(pick));
+                    }
+                    if let Doc::Setlist(_) = pick {
+                        ui.label(
+                            RichText::new("The type is as large as fits on one page.").small().color(theme::MUTED),
+                        );
+                    }
+                    if pick == Doc::MicPlot {
+                        ui.add_space(6.0);
+                        ui.checkbox(&mut opts.mark_changes, "Mark changes since the revision before");
+                    }
+                    if pick.has_revision() {
+                        ui.add_space(12.0);
+                        ui.label(RichText::new("REVISION").small().color(theme::MUTED));
+                        self.revision_box(ui);
+                    }
                     ui.add_space(12.0);
-                    ui.label(RichText::new("REVISION").small().color(theme::MUTED));
-                    self.revision_box(ui);
-                }
-                ui.add_space(12.0);
-                if ui
-                    .add_sized([ui.available_width(), 34.0], egui::Button::new(RichText::new("Export PDF…").strong()))
-                    .clicked()
-                {
-                    if let Some(path) = self.pick_pdf(pick) {
-                        self.export_pdf(pick, &path);
+                    if ui
+                        .add_sized([ui.available_width(), 34.0], egui::Button::new(RichText::new("Export PDF…").strong()))
+                        .clicked()
+                    {
+                        if let Some(path) = self.pick_pdf(pick) {
+                            self.export_pdf(pick, &path);
+                        }
                     }
-                }
+                });
             });
 
         if pick != current {

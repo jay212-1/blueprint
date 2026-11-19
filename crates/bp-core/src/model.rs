@@ -3,6 +3,7 @@
 //! renamed role is renamed everywhere.
 
 use crate::mic::MicPlan;
+use crate::patch::Patch;
 use crate::setlist::{Setlist, Song};
 use serde::{Deserialize, Serialize};
 
@@ -31,6 +32,7 @@ pub struct Project {
     pub mic: MicPlan,
     pub songs: Vec<Song>,
     pub setlists: Vec<Setlist>,
+    pub patch: Patch,
 }
 
 impl Default for Project {
@@ -48,6 +50,7 @@ impl Default for Project {
             mic: MicPlan::default(),
             songs: Vec::new(),
             setlists: Vec::new(),
+            patch: Patch::default(),
         }
     }
 }
@@ -107,6 +110,8 @@ impl Project {
         self.mic.prune(&people, &roles, &scenes, &txs, &capsules);
         let songs: Vec<Id> = self.songs.iter().map(|s| s.id).collect();
         crate::setlist::prune(&mut self.setlists, &songs);
+        let locations: Vec<Id> = self.locations.iter().map(|l| l.id).collect();
+        self.patch.prune(&people, &locations);
     }
 }
 

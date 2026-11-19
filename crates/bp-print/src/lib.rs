@@ -22,12 +22,29 @@ pub enum Doc {
     Frequencies,
     DcaSheet,
     BatteryPlan,
+    InputList,
+    StageboxPlan,
+    OutputList,
+    MonitorList,
+    PackList,
+    Labels,
     /// One setlist (by id).
     Setlist(bp_core::model::Id),
 }
 
 impl Doc {
-    pub const ALL: [Doc; 6] = [
+    /// The prints of the patch.
+    pub const PATCH: [Doc; 6] = [
+        Doc::InputList,
+        Doc::StageboxPlan,
+        Doc::OutputList,
+        Doc::MonitorList,
+        Doc::PackList,
+        Doc::Labels,
+    ];
+
+    /// The prints of the mic plan.
+    pub const MIC: [Doc; 6] = [
         Doc::MicPlot,
         Doc::MicCards,
         Doc::SwapList,
@@ -44,13 +61,19 @@ impl Doc {
             Doc::Frequencies => "Frequency list",
             Doc::DcaSheet => "DCA sheet",
             Doc::BatteryPlan => "Battery plan",
+            Doc::InputList => "Input list",
+            Doc::StageboxPlan => "Stagebox patch",
+            Doc::OutputList => "Output list",
+            Doc::MonitorList => "Monitor / IEM list",
+            Doc::PackList => "Cables and stands",
+            Doc::Labels => "Labels and scribble strips",
             Doc::Setlist(_) => "Setlist",
         }
     }
 
     /// Landscape unless chosen otherwise.
     pub fn landscape(self) -> bool {
-        matches!(self, Doc::MicPlot | Doc::DcaSheet)
+        matches!(self, Doc::MicPlot | Doc::DcaSheet | Doc::InputList | Doc::OutputList)
     }
 
     fn template(self) -> &'static str {
@@ -58,6 +81,7 @@ impl Doc {
             Doc::MicPlot => "mic-plot.typ",
             Doc::MicCards => "mic-cards.typ",
             Doc::Setlist(_) => "setlist.typ",
+            Doc::Labels => "labels.typ",
             _ => "table.typ",
         }
     }
@@ -72,7 +96,7 @@ impl Doc {
 
     /// Prints that keep the plan's revision (the mic plan's).
     pub fn has_revision(self) -> bool {
-        !matches!(self, Doc::Setlist(_))
+        Doc::MIC.contains(&self)
     }
 }
 
@@ -183,7 +207,7 @@ impl Options {
             paper: Paper::A4,
             landscape: doc.landscape(),
             theme: match doc {
-                Doc::Setlist(_) => Theme::Stage,
+                Doc::Setlist(_) | Doc::StageboxPlan => Theme::Stage,
                 _ => Theme::Technical,
             },
             mark_changes: true,
@@ -191,7 +215,8 @@ impl Options {
     }
 }
 
-const TEMPLATES: [(&str, &str); 5] = [
+const TEMPLATES: [(&str, &str); 6] = [
+    ("labels.typ", include_str!("../templates/labels.typ")),
     ("setlist.typ", include_str!("../templates/setlist.typ")),
     ("common.typ", include_str!("../templates/common.typ")),
     ("mic-plot.typ", include_str!("../templates/mic-plot.typ")),

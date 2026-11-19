@@ -26,3 +26,9 @@
 - 2026-11-19: Themes werden pro Dokument angeboten: Setlisten Stage / Technical (FOH) / Elegant, Mic-Pläne Stage / Technical / Save ink.
 - 2026-11-19: Setlisten-Logo als Base64 in der Projektdatei (max. 2 MB, PNG/JPEG/GIF/SVG geprüft), damit das Projekt eine Datei bleibt.
 - 2026-11-19: Demo-Band „Northbound Static“ und ihre Songs sind frei erfunden.
+- 2026-11-19: Patch als eigener Teil des Projekts (`Project.patch`): Geräte (mit Location aus den Stammdaten), Leitungen, Inputs, Outputs. Alles verweist per ID; Signalwege, Prüfungen und Kabelliste werden berechnet.
+- 2026-11-19: Splits als ein Kanal pro Pult/Recorder am Input („Feeds“); jedes Gerät der Art Console oder Recorder bekommt eine Spalte in der Input-Liste. Ein passiver Splitter ist nur Hardware in der Geräteliste.
+- 2026-11-19: Leitung eines Inputs: explizit gewählt oder, wenn die Stagebox genau eine Leitung hat, diese. Bei einem analogen Multicore ist der Leitungskanal der Port; ein Doppel dort wird nur als Port-Doppel gemeldet.
+- 2026-11-19: 48V-Prüfung über eine kurze Liste bekannter Kondensatormikros (und das Wort „condenser“); unbekannte Mikros werden nicht bemängelt. Ein bekanntes Kondensatormikro schaltet beim Eintippen 48V ein.
+- 2026-11-19: Kabelliste: ein Kabel pro Input und Output (Steckertyp der Stagebox, wenn nichts anderes eingetragen ist), pro DI eine DI-Box und ein Instrumentenkabel, IEM-Wege ohne Kabel. Ersatz kommt von Hand dazu (Packliste in M5).
+- 2026-11-19: Ein gemeinsames Patch-Crate für die Suite schlage ich mit dem Austauschformat in M6 vor (bis dahin bleibt alles in bp-core).

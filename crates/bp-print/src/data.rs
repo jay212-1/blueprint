@@ -47,14 +47,16 @@ pub fn build(p: &Project, doc: Doc, opts: &Options) -> Data {
     }
     let view = MicView::build(p);
     let plan = &p.mic;
-    let rev = if plan.revision.number > 0 {
+    let rev = if !doc.has_revision() {
+        format!("Printed {}", today())
+    } else if plan.revision.number > 0 {
         format!("Rev {} · {}", plan.revision.number, plan.revision.date)
     } else {
         format!("Draft · printed {}", today())
     };
     let cast = match plan.variant() {
-        Some(v) => format!("Cast: {}", v.name),
-        None => String::new(),
+        Some(v) if doc.has_revision() => format!("Cast: {}", v.name),
+        _ => String::new(),
     };
     let mut d = json!({
         "title": doc.title(),
@@ -78,6 +80,12 @@ pub fn build(p: &Project, doc: Doc, opts: &Options) -> Data {
         Doc::Frequencies => frequencies(p, &view),
         Doc::DcaSheet => dca_sheet(p),
         Doc::BatteryPlan => battery(p, &view),
+        Doc::InputList => input_list(p),
+        Doc::StageboxPlan => stagebox_plan(p),
+        Doc::OutputList => output_list(p),
+        Doc::MonitorList => monitor_list(p),
+        Doc::PackList => pack(p),
+        Doc::Labels => labels(p),
         Doc::Setlist(_) => Value::Null,
     };
     if let (Some(o), Value::Object(b)) = (d.as_object_mut(), body) {
@@ -502,4 +510,258 @@ fn minutes(secs: f64) -> String {
     } else {
         format!("{m} min")
     }
+}
+
+fn colored(cells: Vec<String>, warn: bool, color: &str) -> Value {
+    json!({ "cells": cells, "warn": warn, "color": color })
+}
+
+fn num(v: Option<u32>) -> String {
+    v.map(|x| x.to_string()).unwrap_or_default()
+}
+
+/// Rows of the patch with a problem: (output?, row).
+fn patch_warnings(p: &Project) -> (Vec<(bool, usize)>, Vec<String>) {
+    let probs = bp_core::patch::check(p);
+    let rows = probs.iter().flat_map(|x| x.rows()).collect();
+    let msgs = probs.iter().map(|x| x.message(p)).collect();
+    (rows, msgs)
+}
+
+fn legend_of(msgs: &[String]) -> String {
+    if msgs.is_empty() {
+        String::new()
+    } else {
+        format!("Check: {}", msgs.join(" · "))
+    }
+}
+
+fn input_list(p: &Project) -> Value {
+    use bp_core::patch::{device_label, link_label};
+    let pa = &p.patch;
+    let desks = pa.desks();
+    let (warn, msgs) = patch_warnings(p);
+    let mut head: Vec<String> = ["Ch", "Name", "Source", "Mic / DI", "Stand", "48V", "Stagebox", "Line"].map(String::from).to_vec();
+    head.extend(desks.iter().map(|d| device_label(p, Some(*d))));
+    head.push("Notes".into());
+    let rows: Vec<Value> = pa
+        .inputs
+        .iter()
+        .enumerate()
+        .map(|(row, i)| {
+            let line = pa.input_line(i);
+            let mut cells = vec![
+                i.no.to_string(),
+                i.name.clone(),
+                i.source.clone(),
+                i.mic.clone(),
+                i.stand.label().to_string(),
+                if i.phantom { "48V".into() } else { String::new() },
+                match (device_label(p, i.stagebox), i.port) {
+                    (d, Some(port)) if !d.is_empty() => format!("{d} / {port}"),
+                    (d, _) => d,
+                },
+                match line {
+                    Some((l, Some(c))) => format!("{} / {c}", link_label(p, Some(l))),
+                    Some((l, None)) => link_label(p, Some(l)),
+                    None => String::new(),
+                },
+            ];
+            cells.extend(desks.iter().map(|d| num(i.feed(*d))));
+            cells.push(i.notes.clone());
+            colored(cells, warn.contains(&(false, row)), &i.color)
+        })
+        .collect();
+    let mut widths = vec![json!(0), json!(1.3), json!(1.4), json!(1), json!(0), json!(0), json!(0), json!(0)];
+    widths.extend(desks.iter().map(|_| json!(0)));
+    widths.push(json!(1.6));
+    json!({ "head": head, "widths": widths, "sections": [section("", rows)], "legend": legend_of(&msgs) })
+}
+
+fn stagebox_plan(p: &Project) -> Value {
+    use bp_core::patch::{location_name, Destination};
+    let pa = &p.patch;
+    let mut sections = Vec::new();
+    for d in pa.devices.iter().filter(|d| !d.kind.is_desk()) {
+        let mut ins: Vec<&bp_core::patch::Input> = pa.inputs.iter().filter(|i| i.stagebox == Some(d.id)).collect();
+        ins.sort_by_key(|i| i.port.unwrap_or(u32::MAX));
+        let mut outs: Vec<&bp_core::patch::Output> = pa.outputs.iter().filter(|o| o.device == Some(d.id)).collect();
+        outs.sort_by_key(|o| o.port.unwrap_or(u32::MAX));
+        if ins.is_empty() && outs.is_empty() {
+            continue;
+        }
+        let mut rows: Vec<Value> = ins
+            .iter()
+            .map(|i| {
+                let what = [i.mic.as_str(), i.stand.label()].iter().filter(|x| !x.is_empty()).copied().collect::<Vec<_>>().join(", ");
+                colored(vec![format!("In {}", num(i.port)), i.no.to_string(), i.name.clone(), what, if i.phantom { "48V".into() } else { String::new() }], false, &i.color)
+            })
+            .collect();
+        rows.extend(outs.iter().map(|o| {
+            let to = if o.dest == Destination::Pa { o.target.clone() } else { format!("{}: {}", o.dest.label(), o.target) };
+            colored(vec![format!("Out {}", num(o.port)), String::new(), o.name.clone(), to, String::new()], false, &o.color)
+        }));
+        let at = location_name(p, d.location);
+        let title = [d.name.as_str(), at.as_str(), d.model.as_str()].iter().filter(|x| !x.is_empty()).copied().collect::<Vec<_>>().join("  ·  ");
+        sections.push(json!({ "title": title, "rows": rows, "newpage": true }));
+    }
+    if sections.is_empty() {
+        sections.push(section("No stagebox has anything plugged in yet.", Vec::new()));
+    }
+    json!({
+        "head": ["Port", "Ch", "Name", "Mic / stand / to", "48V"],
+        "widths": [0, 0, 1.6, 2, 0],
+        "sections": sections,
+        "legend": "One page per stagebox, rack or amp: tape it to the box.",
+    })
+}
+
+fn output_list(p: &Project) -> Value {
+    use bp_core::patch::{device_label, link_label};
+    let pa = &p.patch;
+    let (warn, msgs) = patch_warnings(p);
+    let rows: Vec<Value> = pa
+        .outputs
+        .iter()
+        .enumerate()
+        .map(|(row, o)| {
+            let line = pa.output_line(o);
+            colored(
+                vec![
+                    o.name.clone(),
+                    [device_label(p, o.desk), o.bus.clone()].iter().filter(|x| !x.is_empty()).cloned().collect::<Vec<_>>().join(" "),
+                    match line {
+                        Some((l, Some(c))) => format!("{} / {c}", link_label(p, Some(l))),
+                        Some((l, None)) => link_label(p, Some(l)),
+                        None => String::new(),
+                    },
+                    match (device_label(p, o.device), o.port) {
+                        (d, Some(port)) if !d.is_empty() => format!("{d} / {port}"),
+                        (d, _) => d,
+                    },
+                    o.dest.label().into(),
+                    o.target.clone(),
+                    person(p, o.performer),
+                    o.notes.clone(),
+                ],
+                warn.contains(&(true, row)),
+                &o.color,
+            )
+        })
+        .collect();
+    json!({
+        "head": ["Name", "Desk / bus", "Line", "Device / port", "Goes to", "Speaker / feed", "For", "Notes"],
+        "widths": [1.2, 1, 0, 0, 0, 1.4, 1, 1.5],
+        "sections": [section("", rows)],
+        "legend": legend_of(&msgs),
+    })
+}
+
+fn monitor_list(p: &Project) -> Value {
+    use bp_core::patch::device_label;
+    let pa = &p.patch;
+    let mons: Vec<&bp_core::patch::Output> = pa.outputs.iter().filter(|o| o.dest.is_monitor()).collect();
+    let mut people: Vec<Option<Id>> = Vec::new();
+    for o in &mons {
+        if !people.contains(&o.performer) {
+            people.push(o.performer);
+        }
+    }
+    // People first (cast order), shared ways last.
+    people.sort_by_key(|x| x.map_or(usize::MAX, |id| p.cast.iter().position(|c| c.id == id).unwrap_or(usize::MAX - 1)));
+    let sections: Vec<Value> = people
+        .iter()
+        .map(|who| {
+            let rows: Vec<Value> = mons
+                .iter()
+                .filter(|o| o.performer == *who)
+                .map(|o| {
+                    let dev = match (device_label(p, o.device), o.port) {
+                        (d, Some(port)) if !d.is_empty() => format!("{d} / {port}"),
+                        (d, _) => d,
+                    };
+                    colored(
+                        vec![o.name.clone(), o.dest.label().into(), [device_label(p, o.desk), o.bus.clone()].join(" ").trim().to_string(), dev, o.target.clone(), o.mix_notes.clone()],
+                        false,
+                        &o.color,
+                    )
+                })
+                .collect();
+            let title = match who.and_then(|id| p.person(id)) {
+                Some(x) if !x.notes.is_empty() => format!("{} ({})", x.name, x.notes),
+                Some(x) => x.name.clone(),
+                None => "Shared".into(),
+            };
+            section(&title, rows)
+        })
+        .collect();
+    json!({
+        "head": ["Way", "Kind", "Desk / bus", "Device / port", "Wedge / IEM", "Mix"],
+        "widths": [1, 0, 0, 0, 1.2, 2.5],
+        "sections": sections,
+    })
+}
+
+fn pack(p: &Project) -> Value {
+    let list = bp_core::patch::pack_list(p);
+    let mut groups: Vec<&str> = Vec::new();
+    for x in &list {
+        if !groups.contains(&x.group) {
+            groups.push(x.group);
+        }
+    }
+    let sections: Vec<Value> = groups
+        .iter()
+        .map(|g| {
+            let rows = list
+                .iter()
+                .filter(|x| x.group == *g)
+                .map(|x| row(vec![x.count.to_string(), x.what.clone(), x.notes.clone(), String::new()], false))
+                .collect();
+            section(g, rows)
+        })
+        .collect();
+    json!({
+        "head": ["Count", "What", "Notes", "Packed"],
+        "widths": [0, 1.5, 2, 0.5],
+        "sections": sections,
+        "legend": "Counted from the patch (one cable per input and output, a DI box and an instrument cable per DI). Add spares.",
+    })
+}
+
+fn labels(p: &Project) -> Value {
+    use bp_core::patch::location_name;
+    let pa = &p.patch;
+    let mut strips = Vec::new();
+    for d in pa.devices.iter().filter(|d| d.kind.is_desk()) {
+        let mut ch: Vec<(u32, &bp_core::patch::Input)> = pa.inputs.iter().filter_map(|i| i.feed(d.id).map(|c| (c, i))).collect();
+        if ch.is_empty() {
+            continue;
+        }
+        ch.sort_by_key(|x| x.0);
+        let max = ch.last().map_or(0, |x| x.0);
+        let cells: Vec<Value> = (1..=max)
+            .map(|n| match ch.iter().find(|x| x.0 == n) {
+                Some((_, i)) => json!({"no": n.to_string(), "name": i.name, "color": i.color}),
+                None => json!({"no": n.to_string(), "name": "", "color": ""}),
+            })
+            .collect();
+        strips.push(json!({"title": format!("{}: input channels", d.name), "cells": cells, "per": 8}));
+    }
+    for d in pa.devices.iter().filter(|d| !d.kind.is_desk()) {
+        let ins: Vec<&bp_core::patch::Input> = pa.inputs.iter().filter(|i| i.stagebox == Some(d.id)).collect();
+        if ins.is_empty() {
+            continue;
+        }
+        let cells: Vec<Value> = (1..=d.inputs.max(ins.iter().filter_map(|i| i.port).max().unwrap_or(0)))
+            .map(|n| match ins.iter().find(|i| i.port == Some(n)) {
+                Some(i) => json!({"no": n.to_string(), "name": format!("{} {}", i.no, i.name), "color": i.color}),
+                None => json!({"no": n.to_string(), "name": "", "color": ""}),
+            })
+            .collect();
+        let at = location_name(p, d.location);
+        let title = if at.is_empty() { format!("{}: inputs", d.name) } else { format!("{} ({at}): inputs", d.name) };
+        strips.push(json!({"title": title, "cells": cells, "per": 8}));
+    }
+    json!({ "strips": strips, "legend": "Cut along the dashed lines." })
 }

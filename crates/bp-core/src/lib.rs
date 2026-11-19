@@ -8,6 +8,8 @@ pub mod grid;
 pub mod mic;
 pub mod mic_grid;
 pub mod model;
+pub mod patch;
+pub mod patch_grid;
 pub mod project;
 pub mod setlist;
 pub mod sheet;

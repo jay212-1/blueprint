@@ -381,7 +381,178 @@ pub fn band() -> Project {
             E::S(15, Gap),
         ],
     );
+    band_patch(&mut p);
     p
+}
+
+/// The band's patch: two stageboxes (drum riser and stage right), FOH and
+/// monitor desks, a recorder, an IEM rack; a multicore and a Dante line; every
+/// input split to FOH, monitors and the recording.
+fn band_patch(p: &mut Project) {
+    use crate::model::Location;
+    use crate::patch::{Connector, Destination, Device, DeviceKind, Feed, Input, Link, LinkKind, Output, Stand};
+    let loc = |p: &mut Project, name: &str| {
+        let id = p.alloc_id();
+        p.locations.push(Location { id, name: name.into(), ..Location::default() });
+        id
+    };
+    let riser = loc(p, "Drum riser");
+    let right = loc(p, "Stage right");
+    let foh_at = loc(p, "FOH");
+    let mon_at = loc(p, "Monitor world");
+    let dev = |p: &mut Project, name: &str, kind, at, model: &str, ins, outs, connector| {
+        let id = p.alloc_id();
+        p.patch.devices.push(Device {
+            id,
+            name: name.into(),
+            kind,
+            location: Some(at),
+            model: model.into(),
+            inputs: ins,
+            outputs: outs,
+            connector,
+            ..Device::default()
+        });
+        id
+    };
+    let sb1 = dev(p, "SB1", DeviceKind::Stagebox, riser, "Analog stagebox 16/8", 16, 8, Connector::Xlr);
+    let sb2 = dev(p, "SB2", DeviceKind::Stagebox, right, "Dante stagebox 32/16", 32, 16, Connector::Xlr);
+    let foh = dev(p, "FOH", DeviceKind::Console, foh_at, "Digital console", 64, 32, Connector::Network);
+    let mon = dev(p, "MON", DeviceKind::Console, mon_at, "Digital console", 64, 32, Connector::Network);
+    let rec = dev(p, "REC", DeviceKind::Recorder, foh_at, "Multitrack recorder", 64, 0, Connector::Network);
+    let iem = dev(p, "IEM rack", DeviceKind::Iem, mon_at, "4 stereo IEM transmitters", 4, 4, Connector::Xlr);
+    let link = |p: &mut Project, name: &str, kind, from, to, ch, len: &str| {
+        let id = p.alloc_id();
+        p.patch.links.push(Link { id, name: name.into(), kind, from: Some(from), to: Some(to), channels: ch, length: len.into(), ..Link::default() });
+        id
+    };
+    link(p, "MC1", LinkKind::Multicore, sb1, foh, 16, "40 m");
+    let dante = link(p, "Dante A", LinkKind::Dante, sb2, foh, 64, "CAT6 60 m");
+    let person = |p: &Project, short: &str| p.cast.iter().find(|x| x.short == short).map(|x| x.id);
+    // Name, source, mic, stand, 48V, stagebox (1/2), player, colour.
+    type InRow<'a> = (&'a str, &'a str, &'a str, Stand, bool, u8, &'a str, &'a str);
+    let inputs: [InRow; 26] = [
+        ("Kick in", "Kick", "Beta 91", Stand::Floor, true, 1, "HJ", "red"),
+        ("Kick out", "Kick", "D112", Stand::Small, false, 1, "HJ", "red"),
+        ("Snare top", "Snare", "SM57", Stand::Clamp, false, 1, "HJ", "red"),
+        ("Snare bottom", "Snare", "SM57", Stand::Clamp, false, 1, "HJ", "red"),
+        ("Hi-hat", "Hi-hat", "KM184", Stand::Small, true, 1, "HJ", "red"),
+        ("Tom 1", "Rack tom", "e604", Stand::Clamp, false, 1, "HJ", "red"),
+        ("Tom 2", "Floor tom", "e604", Stand::Clamp, false, 1, "HJ", "red"),
+        ("OH L", "Overhead", "C414", Stand::Tall, true, 1, "HJ", "red"),
+        ("OH R", "Overhead", "C414", Stand::Tall, true, 1, "HJ", "red"),
+        ("Bass DI", "Bass", "DI", Stand::None, false, 1, "YD", "blue"),
+        ("Bass mic", "Bass cab", "MD421", Stand::Small, false, 1, "YD", "blue"),
+        ("Gtr 1", "Electric guitar cab", "e906", Stand::None, false, 2, "MR", "green"),
+        ("Gtr 2", "Electric guitar cab", "SM57", Stand::Small, false, 2, "MR", "green"),
+        ("Ac gtr", "Acoustic guitar", "DI", Stand::None, false, 2, "IL", "yellow"),
+        ("Keys L", "Stage piano", "DI", Stand::None, false, 2, "CV", "purple"),
+        ("Keys R", "Stage piano", "DI", Stand::None, false, 2, "CV", "purple"),
+        ("Synth L", "Synth", "DI", Stand::None, false, 2, "CV", "purple"),
+        ("Synth R", "Synth", "DI", Stand::None, false, 2, "CV", "purple"),
+        ("PB L", "Playback", "DI", Stand::None, false, 1, "HJ", "orange"),
+        ("PB R", "Playback", "DI", Stand::None, false, 1, "HJ", "orange"),
+        ("Click", "Click (monitors only)", "DI", Stand::None, false, 1, "HJ", "orange"),
+        ("Vox Ida", "Lead vocal", "SM58", Stand::Tall, false, 2, "IL", "yellow"),
+        ("BV Malte", "Backing vocal", "SM58", Stand::Tall, false, 2, "MR", "green"),
+        ("BV Carla", "Backing vocal", "SM58", Stand::Tall, false, 2, "CV", "purple"),
+        ("Spare vox", "Spare vocal", "SM58", Stand::Tall, false, 2, "", ""),
+        ("Talkback", "MON talkback", "SM58", Stand::None, false, 2, "", ""),
+    ];
+    let (mut p1, mut p2) = (0, 0);
+    for (k, (name, source, mic, stand, phantom, sb, who, color)) in inputs.iter().enumerate() {
+        let id = p.alloc_id();
+        let no = k as u32 + 1;
+        let (stagebox, port, link_ch) = if *sb == 1 {
+            p1 += 1;
+            (sb1, p1, None)
+        } else {
+            p2 += 1;
+            (sb2, p2, Some(p2))
+        };
+        let mut feeds = vec![Feed { device: foh, channel: no }, Feed { device: mon, channel: no }];
+        if *name != "Click" && *name != "Talkback" {
+            feeds.push(Feed { device: rec, channel: no });
+        }
+        if *name == "Click" {
+            feeds.retain(|f| f.device == mon);
+        }
+        let performer = person(p, who);
+        p.patch.inputs.push(Input {
+            id,
+            no,
+            name: (*name).into(),
+            source: (*source).into(),
+            mic: (*mic).into(),
+            stand: *stand,
+            phantom: *phantom,
+            performer,
+            stagebox: Some(stagebox),
+            port: Some(port),
+            link: (*sb == 2).then_some(dante),
+            link_ch,
+            feeds,
+            notes: match *name {
+                "Kick in" => "Gate".into(),
+                "Vox Ida" => "Insert: compressor".into(),
+                "Talkback" => "Switched mic at monitor world".into(),
+                _ => String::new(),
+            },
+            color: (*color).into(),
+            ..Input::default()
+        });
+    }
+    // The talkback mic is plugged at monitor world, not on stage.
+    if let Some(t) = p.patch.inputs.last_mut() {
+        t.stagebox = None;
+        t.port = None;
+        t.link = None;
+        t.link_ch = None;
+        t.cable = "XLR 5 m".into();
+    }
+
+    // Name, desk, bus, device, port, destination, target, for, mix notes.
+    type OutRow<'a> = (&'a str, Id, &'a str, Id, u32, Destination, &'a str, &'a str, &'a str);
+    let outs: [OutRow; 12] = [
+        ("PA L", foh, "Main L", sb2, 1, Destination::Pa, "Main hang left", "", ""),
+        ("PA R", foh, "Main R", sb2, 2, Destination::Pa, "Main hang right", "", ""),
+        ("Subs", foh, "Matrix 1", sb2, 3, Destination::Pa, "Sub array", "", ""),
+        ("Front fill", foh, "Matrix 2", sb2, 4, Destination::Pa, "Front fills", "", ""),
+        ("Wedge Malte", mon, "Mix 1", sb2, 5, Destination::Monitor, "Wedge DS left", "MR", "Guitars, vocal, some kick"),
+        ("Wedge Yusuf", mon, "Mix 2", sb1, 1, Destination::Monitor, "Wedge by the bass amp", "YD", "Kick, snare, click"),
+        ("Drum fill", mon, "Mix 3", sb1, 2, Destination::Monitor, "Drum sub and top", "HJ", "Bass, keys, kick"),
+        ("Sidefill", mon, "Mix 4/5", sb2, 6, Destination::Monitor, "Sidefills L and R", "", "Vocals, guitars"),
+        ("IEM Ida", mon, "Mix 7/8", iem, 1, Destination::Iem, "IEM 1", "IL", "Lots of vocal, acoustic, no click"),
+        ("IEM Carla", mon, "Mix 9/10", iem, 2, Destination::Iem, "IEM 2", "CV", "Keys, vocals, click"),
+        ("IEM Henrik", mon, "Mix 11/12", iem, 3, Destination::Iem, "IEM 3", "HJ", "Click loud, bass, playback"),
+        ("Broadcast", foh, "Matrix 3/4", rec, 1, Destination::Broadcast, "Stream feed", "", "Mix minus talk"),
+    ];
+    for (name, desk, bus, device, port, dest, target, who, mix) in outs {
+        let id = p.alloc_id();
+        let performer = person(p, who);
+        p.patch.outputs.push(Output {
+            id,
+            name: name.into(),
+            desk: Some(desk),
+            bus: bus.into(),
+            device: Some(device),
+            port: Some(port),
+            // SB2 outputs come back over Dante (returns 1–6), SB1 over the multicore.
+            link: (device == sb2).then_some(dante),
+            link_ch: (device == sb2).then_some(port),
+            dest,
+            target: target.into(),
+            performer,
+            mix_notes: mix.into(),
+            ..Output::default()
+        });
+    }
+    // The broadcast feed goes on an AES cable to the truck.
+    if let Some(b) = p.patch.outputs.last_mut() {
+        b.device = None;
+        b.port = None;
+        b.cable = "AES 30 m".into();
+    }
 }
 
 #[cfg(test)]
@@ -428,6 +599,12 @@ mod tests {
         let fest = timing(&p, &p.setlists[1]);
         // A festival slot of about 45 minutes.
         assert!((2400.0..2900.0).contains(&fest.total), "{}", fest.total);
+        // The patch is clean, every input is split.
+        let probs = crate::patch::check(&p);
+        assert!(probs.is_empty(), "{:#?}", probs.iter().map(|x| x.message(&p)).collect::<Vec<_>>());
+        assert_eq!(p.patch.inputs.len(), 26);
+        assert!(p.patch.inputs.iter().filter(|i| i.feeds.len() == 3).count() >= 20);
+        assert!(crate::patch::pack_list(&p).iter().any(|x| x.what == "DI box" && x.count == 9));
         // Shared songs: one library entry used in both.
         assert_eq!(p.song_uses(p.songs[0].id), 2);
         let text = crate::project::to_string(&p).unwrap();
