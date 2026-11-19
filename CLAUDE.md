@@ -51,10 +51,12 @@ Showtime Suite installs, updates and starts the others; its catalog is `showtime
   problems; `mic_grid.rs` shows it as tables; `grid.rs` is the table interface all lists share;
   `demo.rs` the demo musical and the demo band show. `setlist.rs` – song library, setlists, times
   (`timing`) and their tables. `patch.rs` – devices, lines, inputs with splits, outputs, signal
-  paths, checks, cable and stand list; `patch_grid.rs` its tables.
+  paths, checks, cable and stand list; `patch_grid.rs` its tables. `plans.rs` – the other plans
+  (run of show, contacts, packing list, intercom, free tables), `stage.rs` – the stage plot and its
+  symbols as shapes, `plan_grid.rs` their tables.
 - `crates/bp-print` – Typst printing: `templates/*.typ` (layout and themes, kept apart from the
-  code; `setlist.typ` fits the type to one page), `fonts/` (OFL, embedded), `data.rs` (plans to JSON for the templates).
-- `crates/blueprint` – the egui app: `app.rs` (window, project actions), `app_*.rs` (pages),
+  code; `setlist.typ` fits the type to one page, `plan.typ` the other plans and the stage plot), `fonts/` (OFL, embedded), `data.rs` (plans to JSON for the templates).
+- `crates/blueprint` – the egui app: `app.rs` (window, project actions), `app_*.rs` (pages; `app_stage.rs` the stage plot editor),
   `table.rs` (reusable spreadsheet editor that emits `Action`s), `theme.rs` (suite colours),
   `settings.rs` (`BLUEPRINT_CONFIG_DIR` redirects them; tests never touch the real settings).
 - `packaging/`, `release.sh`, `install-mac.sh`, `install.sh` – as in Lantern.

@@ -32,3 +32,8 @@
 - 2026-11-19: 48V-Prüfung über eine kurze Liste bekannter Kondensatormikros (und das Wort „condenser“); unbekannte Mikros werden nicht bemängelt. Ein bekanntes Kondensatormikro schaltet beim Eintippen 48V ein.
 - 2026-11-19: Kabelliste: ein Kabel pro Input und Output (Steckertyp der Stagebox, wenn nichts anderes eingetragen ist), pro DI eine DI-Box und ein Instrumentenkabel, IEM-Wege ohne Kabel. Ersatz kommt von Hand dazu (Packliste in M5).
 - 2026-11-19: Ein gemeinsames Patch-Crate für die Suite schlage ich mit dem Austauschformat in M6 vor (bis dahin bleibt alles in bp-core).
+- 2026-11-19: Weitere Pläne als `Project.plans: Vec<Plan>` mit `PlanKind` (serde `type`/`data`); ein neuer Plantyp ist eine neue Variante plus Tabellen in `plan_grid.rs` und ein Zweig in `plan.typ`.
+- 2026-11-19: Stageplot-Symbole werden in bp-core als einfache Formen (Polygon, Kreis, Linie, Text in Metern, schon gedreht) berechnet; App und Druck zeichnen dieselben Formen, damit beides gleich aussieht.
+- 2026-11-19: Stageplot-Koordinaten in Metern, Ursprung hinten links, Publikum unten; Ziehen rastet beim Loslassen auf das Raster ein.
+- 2026-11-19: Packliste: Zeilen „From Patch / Mic plan“ werden beim Neuzählen ersetzt (Gruppe, Was, Anzahl gesperrt), Gepackt-Häkchen, Case und Notizen bleiben; eigene Zeilen werden nie angefasst.
+- 2026-11-19: Plan-Drucke bauen ihre Tabellen generisch aus dem `Grid` des Plans (Farbspalten werden Zeilentönung, Checkbox-Spalten gezeichnete Kästchen).

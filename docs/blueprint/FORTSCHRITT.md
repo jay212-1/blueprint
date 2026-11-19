@@ -97,7 +97,38 @@ stands“ ansehen, „Print / PDF“ › PATCH › alle sechs Drucke durchklicke
 manuellen Posten (M5), Austauschformat für die Live-Tools (Kanalnamen, Patch, DCA) und Vorschlag
 für ein gemeinsames Crate (M6).
 
-## Als Nächstes: M5 – Sonstige Pläne
+## M5 – Sonstige Pläne (in 0.1.0, 2026-11-19) ✅
 
-Stageplot (Symbolbibliothek, Raster, Maßstab, Verknüpfung mit Inputs), Run of Show, Kontakte,
-Packliste, Intercom, freie Tabellen.
+- Erweiterbares Plan-System: `Project.plans` mit `PlanKind` (Stageplot, Run of Show, Kontakte,
+  Packliste, Intercom/Funk, freie Tabelle). In der Navigation unter „MORE PLANS“, neu über
+  „+ New plan“; umbenennen, Notizen, duplizieren, löschen (mit Undo).
+- Stageplot: Bühne in Metern mit Raster und Vorderkante, 16 Symbole (Stative, Wedges, Drumkit,
+  Keys, Amps, DI, Strom, Podest, Person, IEM, Speaker, Stagebox, Stuhl, Text). Klicken wählt, Ziehen
+  verschiebt (rastet ein), Pfeile schieben, R dreht, Entf löscht; Eigenschaftsleiste mit Label,
+  Inputs („1-7, 9“), Drehen, Duplizieren. Verknüpfte Inputs als Kanal-Badge. Druck quer mit
+  Maßstab und Liste „Inputs on stage“, dazu PNG-Export (300 dpi).
+- Run of Show: Start, Länge, Ende (berechnet; ohne Start folgt die Zeile der vorigen), Was, Wer,
+  Wo, Cue, Notizen, Farbe.
+- Kontakte mit Gruppen (im Druck getrennt), „Add the cast“ übernimmt die Besetzung.
+- Packliste: „Count from patch and mic plan“ zählt Leitungen, Kabel, DIs, Mikros, Stative, Sender,
+  Kapseln und Akkus; eigene Zeilen und Gepackt-Häkchen bleiben beim Neuzählen erhalten.
+- Intercom/Funk: Kanäle (Partyline, Wireless, Funk, Programm) und Personen mit Talk/Listen pro
+  Kanal.
+- Freie Tabellen mit Spalten der Art Text, Zahl, Uhrzeit, Dauer, Checkbox, Auswahl, Farbe; im
+  Druck mit gezeichneten Kästchen.
+- Alle Pläne drucken in den drei Themes; die Demo-Band hat je einen Plan jeder Art.
+- Tests: 56 Kern-Tests, 7 Druck-Tests, 15 UI-Tests.
+
+**Zum Testen:** Startseite › „Try the demo band show“ › MORE PLANS › „Stage plot“. Ein Stativ
+ziehen, R drücken, im Feld „Inputs“ „25“ eintragen, ein Symbol aus „Add“ hinzufügen, „Print…“ ›
+„Export PNG…“. Danach „Packing list“ › „Count from patch and mic plan“, beim Intercom den Reiter
+„Channels“, bei der Guest list unter „Columns“ eine Spalte vom Typ „Check box“ anlegen.
+
+**Offen / bewusst später:** Symbole frei skalieren per Maus (geht über Breite/Tiefe in der
+Tabelle), eigene Symbole/Bilder, Mehrfachauswahl auf der Bühne.
+
+## Als Nächstes: M6 – Import/Export und Release
+
+CSV/TSV/XLSX-Import mit Spaltenzuordnung, Gesamt-PDF mit Inhaltsverzeichnis, CSV- und PNG-Export,
+Austauschformat für die Suite (Kanalnamen, Patch, DCA), Packaging Linux/Windows, Dry-Run, erster
+Release nach deiner Freigabe.
