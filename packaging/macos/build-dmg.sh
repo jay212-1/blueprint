@@ -2,7 +2,9 @@
 # Builds dist/Blueprint-x.y.z.dmg on a Mac, for this Mac's architecture
 # (one compile). UNIVERSAL=1 builds Apple Silicon + Intel. The DMG is only
 # made again when the program changed. The list of what belongs to this
-# build: dist/files-mac.txt.
+# build: dist/files-mac.txt. PROFILE=local (install-mac.sh) builds without
+# link-time optimisation, so a change takes seconds instead of minutes;
+# releases use the default, PROFILE=release.
 set -euo pipefail
 cd "$(dirname "$0")/../.."
 # shellcheck source=../../scripts/ui.sh
@@ -16,6 +18,7 @@ ui_header "Blueprint $V" "Mac bauen"
 
 if [ "$(sysctl -n hw.optional.arm64 2>/dev/null || echo 0)" = "1" ]; then HOST=arm64; else HOST=x86_64; fi
 ARCHS="${ARCHS:-$HOST}"
+PROFILE="${PROFILE:-release}"
 [ -n "${UNIVERSAL:-}" ] && ARCHS="arm64 x86_64"
 BINS=()
 for a in $ARCHS; do
@@ -24,12 +27,12 @@ for a in $ARCHS; do
     *) a=x86_64; t=x86_64-apple-darwin ;;
   esac
   if [ "$a" = "$HOST" ] && [ "$(uname -m)" = "$HOST" ]; then
-    ui_run "Programm für diesen Mac ($a)" cargo build --release --locked
-    BINS+=("target/release/blueprint")
+    ui_run "Programm für diesen Mac ($a)" cargo build --profile "$PROFILE" --locked
+    BINS+=("target/$PROFILE/blueprint")
   else
     rustup target list --installed 2>/dev/null | grep -qx "$t" || ui_run "Rust-Ziel $t (einmalig)" rustup target add "$t"
-    ui_run "Programm für $a" cargo build --release --locked --target "$t"
-    BINS+=("target/$t/release/blueprint")
+    ui_run "Programm für $a" cargo build --profile "$PROFILE" --locked --target "$t"
+    BINS+=("target/$t/$PROFILE/blueprint")
   fi
 done
 

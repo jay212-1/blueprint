@@ -63,8 +63,10 @@ setup_rust
 
 V=$(sed -n 's/^version = "\(.*\)"/\1/p' Cargo.toml | head -n 1)
 ui_section "Blueprint $V"
-ui_run "Programm bauen" cargo build --release --locked
-BIN=target/release/blueprint
+# The quick profile (see Cargo.toml): seconds per change instead of minutes.
+PROFILE="${PROFILE:-local}"
+ui_run "Programm bauen" cargo build --profile "$PROFILE" --locked
+BIN=target/$PROFILE/blueprint
 
 # --- Installieren (nur wenn sich etwas geändert hat) -------------------------
 if user_app_current blueprint blueprint "$BIN"; then

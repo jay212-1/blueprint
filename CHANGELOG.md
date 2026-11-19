@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.2.2
+
+- Faster local installs: `install-mac.sh` and `install.sh` build with the new `local` profile (no
+  link-time optimisation, incremental). After the first build a change takes seconds instead of
+  about 3½ minutes (a version bump about 35 s). Releases still use the fully optimised `release`
+  profile; `PROFILE=release bash install-mac.sh` builds a local copy the same way.
+
 ## 0.2.1
 
 - Cast: a "Vocal range" column (soprano, baritone …); it is matched on import ("Stimmlage",

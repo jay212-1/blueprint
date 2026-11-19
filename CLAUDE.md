@@ -70,6 +70,9 @@ BLUEPRINT_SHOTS=/some/folder cargo test --workspace   # UI tests also write scre
 cargo clippy --workspace --all-targets -- -D warnings
 ```
 
+- `install-mac.sh` / `install.sh` build with `--profile local` (Cargo.toml: no LTO, incremental,
+  seconds per change); `release.sh` and the packaging scripts use `release` (thin LTO, minutes).
+  `PROFILE=release` switches the install scripts to the release build.
 - No `unwrap()` / `expect()` / `panic!` in code that runs on user input or files (Clippy warns;
   tests may).
 - UI texts are English. Only glyphs of egui's default fonts in UI strings (others panic in tests).
