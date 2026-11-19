@@ -1,0 +1,4 @@
+/target
+*.autosave
+.DS_Store
+/dist

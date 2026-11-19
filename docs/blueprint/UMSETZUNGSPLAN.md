@@ -18,7 +18,7 @@ blueprint/
   Cargo.toml            [workspace] members=["crates/*"], [workspace.package] version="0.1.0",
                         edition 2021, rust-version, license "MIT OR Apache-2.0",
                         Lints und Profile wie Lantern
-  .cargo/config.toml    [env] RUST_MIN_STACK=268435456 (sonst stürzt rustc beim Linken von Typst ab, im Prototyp gemessen)
+  (kein .cargo/config.toml: RUST_MIN_STACK dort ließ rustc abstürzen, siehe decisions.md)
   crates/bp-core/       Modell, IDs, Projektdatei (JSON, schema_version, Migrationen, atomares Speichern),
                         Undo-Stack, Autosave/Recovery, Prüfungen, Berechnungen, Import (CSV/TSV/XLSX)
   crates/bp-print/      Typst-Welt, Vorlagen (templates/*.typ, getrennt vom Code), Themes, Fonts (fonts/*.ttf),

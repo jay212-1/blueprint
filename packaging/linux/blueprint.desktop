@@ -1,0 +1,8 @@
+[Desktop Entry]
+Type=Application
+Name=Blueprint
+Comment=Planning for live shows: mic plots, setlists, patch plans
+Exec=blueprint %f
+Icon=blueprint
+Terminal=false
+Categories=Office;AudioVideo;

@@ -1,0 +1,17 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024">
+  <rect x="64" y="64" width="896" height="896" rx="200" fill="#14171c"/>
+  <rect x="64" y="64" width="896" height="896" rx="200" fill="none" stroke="#2a2f38" stroke-width="8"/>
+  <!-- The sheet -->
+  <rect x="232" y="232" width="560" height="560" rx="36" fill="#1d5fa0"/>
+  <g stroke="#3898ec" stroke-width="6" opacity="0.9">
+    <path d="M 232 344 H 792 M 232 456 H 792 M 232 568 H 792 M 232 680 H 792"/>
+    <path d="M 344 232 V 792 M 456 232 V 792 M 568 232 V 792 M 680 232 V 792"/>
+  </g>
+  <!-- The plan drawn on it: a stage with a mic position -->
+  <g fill="none" stroke="#eaf3fd" stroke-width="22" stroke-linecap="round" stroke-linejoin="round">
+    <path d="M 312 640 L 312 400 L 712 400 L 712 640"/>
+    <path d="M 312 640 Q 512 720 712 640"/>
+  </g>
+  <circle cx="512" cy="520" r="40" fill="#eaf3fd"/>
+  <rect x="232" y="232" width="560" height="560" rx="36" fill="none" stroke="#3898ec" stroke-width="10"/>
+</svg>
