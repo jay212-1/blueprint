@@ -79,6 +79,8 @@ pub struct App {
     pub stage: crate::app_stage::StageState,
     /// An import waiting for its columns (shown above its table).
     pub import: Option<crate::app_import::ImportState>,
+    /// The new-project form of the start screen.
+    pub start: crate::app_start::StartState,
 }
 
 impl App {
@@ -104,6 +106,7 @@ impl App {
             plan_part: HashMap::new(),
             stage: Default::default(),
             import: None,
+            start: Default::default(),
         };
         if let Some(p) = open {
             app.open_path(&p);
@@ -148,8 +151,10 @@ impl App {
     fn run(&mut self, after: After) {
         match after {
             After::New => {
-                self.set_doc(Document::new(Project::default()));
-                self.page = Page::Production;
+                // Back to the start screen with the form open.
+                self.discard_untitled_autosave();
+                self.doc = None;
+                self.open_new_form();
             }
             After::Demo => {
                 self.set_doc(Document::new(bp_core::demo::musical()));
@@ -177,7 +182,16 @@ impl App {
         }
     }
 
+    /// Work on a new project (not saved yet).
+    pub(crate) fn start_new_document(&mut self, project: Project) {
+        self.set_doc(Document::new(project));
+        self.page = Page::Production;
+    }
+
     fn set_doc(&mut self, doc: Document) {
+        self.start.form = false;
+        self.start.error = None;
+        self.import = None;
         self.doc = Some(doc);
         self.tables.clear();
         self.last_autosave = Instant::now();
@@ -368,6 +382,14 @@ impl App {
                 }
             }
         }
+        // Files dropped on the window or handed over by the system.
+        let mut files = crate::open_files::take();
+        files.extend(ctx.input(|i| i.raw.dropped_files.iter().map(|f| f.path().to_path_buf()).collect::<Vec<_>>()));
+        if let Some(p) = files.into_iter().find(|p| p.extension().and_then(|e| e.to_str()) == Some(project::EXTENSION)) {
+            if self.modal.is_none() {
+                self.open(Some(p));
+            }
+        }
         self.autosave();
 
         let title = match &self.doc {
@@ -401,7 +423,7 @@ impl App {
         let ctx = ui.ctx().clone();
         if self.doc.is_none() {
             egui::CentralPanel::default()
-                .frame(egui::Frame::NONE.fill(theme::BG).inner_margin(egui::Margin::same(14)))
+                .frame(egui::Frame::NONE.fill(theme::BG))
                 .show(ui, |ui| self.start_page(ui));
         } else {
             egui::Panel::top("top_bar")
@@ -436,6 +458,7 @@ impl App {
         ui.horizontal(|ui| {
             ui.label(RichText::new("Blueprint").strong().color(theme::BRAND).size(16.0));
             ui.separator();
+            ui.menu_button("File", |ui| self.file_menu(ui));
             let (title, dirty, can_undo, can_redo) = match &self.doc {
                 Some(d) => (d.title(), d.dirty, d.can_undo(), d.can_redo()),
                 None => return,
@@ -445,14 +468,8 @@ impl App {
                 ui.label(RichText::new("unsaved").small().color(theme::WARN));
             }
             ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
-                if ui.button("Close").on_hover_text("Close the project").clicked() {
-                    self.close_project();
-                }
                 if ui.button("Save").on_hover_text("Save (Cmd/Ctrl+S)").clicked() {
                     self.save();
-                }
-                if ui.button("Open…").on_hover_text("Open a project (Cmd/Ctrl+O)").clicked() {
-                    self.open(None);
                 }
                 ui.separator();
                 if ui
@@ -471,6 +488,58 @@ impl App {
                 }
             });
         });
+    }
+
+    /// The File menu: like the other suite apps.
+    fn file_menu(&mut self, ui: &mut egui::Ui) {
+        ui.set_min_width(220.0);
+        if ui.button("Start screen").clicked() {
+            ui.close();
+            self.close_project();
+        }
+        ui.separator();
+        if ui.add(egui::Button::new("New project…").shortcut_text("Cmd/Ctrl+N")).clicked() {
+            ui.close();
+            self.new_project();
+        }
+        if ui.add(egui::Button::new("Open…").shortcut_text("Cmd/Ctrl+O")).clicked() {
+            ui.close();
+            self.open(None);
+        }
+        let recent = self.settings.recent.clone();
+        ui.add_enabled_ui(!recent.is_empty(), |ui| {
+            ui.menu_button("Open recent", |ui| {
+                for p in &recent {
+                    let name = p.file_stem().map(|s| s.to_string_lossy().to_string()).unwrap_or_default();
+                    let there = p.is_file();
+                    let r = ui.add_enabled(there, egui::Button::new(name)).on_hover_text(p.display().to_string());
+                    if r.clicked() {
+                        ui.close();
+                        self.open(Some(p.clone()));
+                    }
+                }
+                ui.separator();
+                if ui.button("Clear list").clicked() {
+                    ui.close();
+                    self.settings.recent.clear();
+                    self.settings.save();
+                }
+            });
+        });
+        ui.separator();
+        if ui.add(egui::Button::new("Save").shortcut_text("Cmd/Ctrl+S")).clicked() {
+            ui.close();
+            self.save();
+        }
+        if ui.add(egui::Button::new("Save as…").shortcut_text("Shift+Cmd/Ctrl+S")).clicked() {
+            ui.close();
+            self.save_as();
+        }
+        ui.separator();
+        if ui.button("Close project").clicked() {
+            ui.close();
+            self.close_project();
+        }
     }
 
     fn nav(&mut self, ui: &mut egui::Ui) {

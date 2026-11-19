@@ -42,3 +42,6 @@
 - 2026-11-19: Tabellendateien liest calamine (XLSX/XLS/ODS, ohne chrono); Text wird als UTF-8, UTF-16 mit BOM oder sonst Windows-1252 gelesen. CSV-Export mit BOM, damit Excel Umlaute richtig zeigt.
 - 2026-11-19: Production pack: jede Druckvorlage wird einzeln gesetzt, die Seiten werden zu einem Typst-Dokument zusammengefügt; das Deckblatt wird zweimal gesetzt, falls das Inhaltsverzeichnis mehr als eine Seite braucht. Seitenzahlen im Fuß bleiben pro Druck, das Inhaltsverzeichnis nennt die Seiten des ganzen PDFs.
 - 2026-11-19: Austauschformat `showtime-exchange` Version 1 als JSON ohne Blueprint-IDs (Bezug über Kanalnummern und Namen); Leser ignorieren unbekannte Felder und lehnen höhere Versionen ab. Es liegt vorerst in bp-core; ein gemeinsames Crate für die Suite schlage ich separat vor.
+- 2026-11-19: Startbildschirm und Dateiverwaltung wie Show Master: prozeduraler Hintergrund (Blaupause mit Bühnenplan), Karten für Neu/Öffnen, Liste „Recent“, Demos klein in der Ecke unten rechts; File-Menü mit Open recent.
+- 2026-11-19: Ein neues Projekt bekommt einen eigenen Ordner (`<Ort>/<Name>/<Name>.blueprint`, Standard Dokumente/Blueprint) und wird sofort gespeichert; der zuletzt gewählte Ort wird gemerkt.
+- 2026-11-19: Ab 0.2.0 wird die Version bei jeder Änderung erhöht (die Ausnahme „bleibt 0.1.0“ ist vorbei).

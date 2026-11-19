@@ -152,3 +152,15 @@ Tabelle), eigene Symbole/Bilder, Mehrfachauswahl auf der Bühne.
 **Offen:** erster Release nach deiner Freigabe (Linux und Windows baut der Arch-PC), danach der
 Launcher-Katalog im Release-Repo der Suite. Ob das Austauschformat in ein gemeinsames Crate der
 Suite wandert (damit Show Master es direkt liest), entscheiden wir noch.
+
+## 0.2.0 – Startbildschirm und Dateiverwaltung (2026-11-19) ✅
+
+- Startbildschirm wie bei Show Master und Lantern: Hintergrund mit Blaupausen-Raster und
+  leuchtendem Bühnenplan, Logo, Karten „New project“ / „Open project“ (und „Recover“), Liste der
+  zuletzt geöffneten Projekte mit Ordner und Datum, Demos unten rechts in der Ecke.
+- „New project“: Name und Ort (Standard Dokumente/Blueprint), legt einen eigenen Ordner mit der
+  Projektdatei an und speichert sofort.
+- File-Menü: Start screen, New project…, Open…, Open recent, Save, Save as…, Close project.
+- `.blueprint`-Dateien öffnen per Drag & Drop aufs Fenster und aus dem Finder bei laufendem Programm.
+- Ab jetzt steigt die Version mit jeder Änderung.
+- Tests: 18 UI-Tests (neu: Formular, Ordner, Recent, File-Menü, Drag & Drop).

@@ -13,6 +13,8 @@ pub const MAX_RECENT: usize = 10;
 pub struct Settings {
     pub recent: Vec<PathBuf>,
     pub last_dir: Option<PathBuf>,
+    /// Where the last new project was made.
+    pub new_dir: Option<PathBuf>,
 }
 
 /// The settings folder.

@@ -28,6 +28,8 @@ fn harness() -> Harness<'static, App> {
     let mut app = App::new(&egui::Context::default(), None);
     app.dialogs = false;
     app.untitled_recovery = None;
+    // New projects go to a folder of their own (never the real Documents).
+    app.start.location = tempfile::tempdir().unwrap().keep();
     let mut b = Harness::builder().with_size(egui::vec2(1280.0, 800.0));
     if std::env::var_os("BLUEPRINT_SHOTS").is_some() {
         b = b.wgpu();
@@ -73,6 +75,19 @@ fn type_text(h: &mut Harness<'static, App>, text: &str) {
     settle(h);
 }
 
+/// Make a project through the start screen's form.
+fn new_project(h: &mut Harness<'static, App>, name: &str) {
+    h.get_by_label("New project").click();
+    settle(h);
+    assert!(h.state().start.form);
+    h.get_by_label("Production").focus();
+    settle(h);
+    type_text(h, name);
+    h.get_by_label("Create project").click();
+    settle(h);
+    assert!(h.state().doc.is_some(), "{:?}", h.state().start.error);
+}
+
 fn open_sheet(h: &mut Harness<'static, App>, sheet: Sheet) {
     h.state_mut().page = Page::Sheet(sheet);
     settle(h);
@@ -89,15 +104,81 @@ fn start_page_creates_a_project() {
     assert!(h.state().doc.is_none());
     h.get_by_label("New project").click();
     settle(&mut h);
-    assert!(h.state().doc.is_some());
+    shot(&mut h, "start_new");
+    h.get_by_label("Production").focus();
+    settle(&mut h);
+    type_text(&mut h, "Summer Tour: 2027");
+    h.get_by_label("Create project").click();
+    settle(&mut h);
+    // Its own folder, the file in it, saved at once with the name.
+    let file = h.state().start.location.join("Summer Tour- 2027").join("Summer Tour- 2027.blueprint");
+    assert!(file.is_file());
+    let doc = h.state().doc.as_ref().unwrap();
+    assert_eq!(doc.path.as_deref(), Some(file.as_path()));
+    assert_eq!(doc.project.meta.production, "Summer Tour: 2027");
+    assert!(!doc.dirty);
+    assert_eq!(h.state().settings.recent.first(), Some(&file));
     shot(&mut h, "production");
+
+    // The same name again: the folder exists, nothing is made.
+    h.state_mut().close_project();
+    settle(&mut h);
+    shot(&mut h, "start_recent");
+    h.get_by_label("New project").click();
+    settle(&mut h);
+    h.get_by_label("Production").focus();
+    settle(&mut h);
+    type_text(&mut h, "Summer Tour: 2027");
+    assert!(h.state().start.problem().is_some_and(|p| p.contains("exists already")));
+    h.state_mut().create_project();
+    settle(&mut h);
+    assert!(h.state().doc.is_none());
+    h.get_by_label("Cancel").click();
+    settle(&mut h);
+    assert!(!h.state().start.form, "{:?}", h.state().start.error);
+
+    // Recent projects open with a click.
+    h.get_by_label("Summer Tour- 2027").click();
+    settle(&mut h);
+    assert_eq!(h.state().doc.as_ref().and_then(|d| d.path.clone()), Some(file));
+}
+
+#[test]
+fn file_menu_and_dropped_files() {
+    let mut h = harness();
+    new_project(&mut h, "Menu Show");
+    let first = h.state().doc.as_ref().unwrap().path.clone().unwrap();
+    h.get_by_label("File").click();
+    settle(&mut h);
+    shot(&mut h, "file_menu");
+    h.get_by_label_contains("New project…").click();
+    settle(&mut h);
+    // Back on the start screen with the form open.
+    assert!(h.state().doc.is_none());
+    assert!(h.state().start.form);
+    h.get_by_label("Cancel").click();
+    settle(&mut h);
+
+    // A file dropped on the window opens.
+    #[derive(Debug)]
+    struct Dropped(PathBuf);
+    impl egui::DroppedFile for Dropped {
+        fn path(&self) -> &std::path::Path {
+            &self.0
+        }
+        fn bytes(&self) -> Result<Vec<u8>, String> {
+            std::fs::read(&self.0).map_err(|e| e.to_string())
+        }
+    }
+    h.input_mut().dropped_files.push(std::sync::Arc::new(Dropped(first.clone())));
+    settle(&mut h);
+    assert_eq!(h.state().doc.as_ref().and_then(|d| d.path.clone()), Some(first));
 }
 
 #[test]
 fn typing_in_the_cast_table_with_tab_and_enter() {
     let mut h = harness();
-    h.get_by_label("New project").click();
-    settle(&mut h);
+    new_project(&mut h, "Test Show");
     open_sheet(&mut h, Sheet::Cast);
     h.get_by_label("Add person").click();
     settle(&mut h);
@@ -124,8 +205,7 @@ fn typing_in_the_cast_table_with_tab_and_enter() {
 #[test]
 fn pasting_rows_from_a_spreadsheet() {
     let mut h = harness();
-    h.get_by_label("New project").click();
-    settle(&mut h);
+    new_project(&mut h, "Test Show");
     open_sheet(&mut h, Sheet::Transmitters);
     // Focus the empty table, then paste three rows.
     h.get_by_label_contains("No transmitters yet").click();
@@ -147,8 +227,7 @@ fn pasting_rows_from_a_spreadsheet() {
 #[test]
 fn roles_link_to_the_cast() {
     let mut h = harness();
-    h.get_by_label("New project").click();
-    settle(&mut h);
+    new_project(&mut h, "Test Show");
     open_sheet(&mut h, Sheet::Cast);
     h.get_by_label_contains("No cast yet").click();
     settle(&mut h);
@@ -175,8 +254,7 @@ fn save_reopen_and_recover() {
     let dir = tempfile::tempdir().unwrap();
     let path = dir.path().join("Show.blueprint");
     let mut h = harness();
-    h.get_by_label("New project").click();
-    settle(&mut h);
+    new_project(&mut h, "Test Show");
     h.state_mut()
         .doc
         .as_mut()
@@ -204,7 +282,7 @@ fn save_reopen_and_recover() {
 }
 
 fn demo(h: &mut Harness<'static, App>) {
-    h.get_by_label_contains("Try the demo musical").click();
+    h.get_by_label_contains("Demo musical").click();
     settle(h);
     assert_eq!(h.state().page, Page::Mic(MicSheet::Plot));
 }
@@ -301,7 +379,7 @@ fn print_preview_and_pdf() {
 #[test]
 fn band_show_setlists() {
     let mut h = harness();
-    h.get_by_label_contains("demo band show").click();
+    h.get_by_label_contains("Demo band show").click();
     settle(&mut h);
     let club = project(&h).setlists[0].id;
     assert_eq!(h.state().page, Page::Setlist(club));
@@ -375,7 +453,7 @@ fn band_show_setlists() {
 fn patch_pages_and_checks() {
     use bp_core::patch_grid::PatchSheet;
     let mut h = harness();
-    h.get_by_label_contains("demo band show").click();
+    h.get_by_label_contains("Demo band show").click();
     settle(&mut h);
     h.get_by_label("Input patch").click();
     settle(&mut h);
@@ -423,11 +501,14 @@ fn patch_pages_and_checks() {
 fn choice_menu_button_stays_when_the_pointer_moves_onto_it() {
     use bp_core::patch_grid::PatchSheet;
     let mut h = harness();
-    h.get_by_label_contains("demo band show").click();
+    h.get_by_label_contains("Demo band show").click();
     settle(&mut h);
     h.state_mut().page = Page::Patch(PatchSheet::Inputs);
     settle(&mut h);
     let arrows = |h: &Harness<'static, App>| h.query_all_by_label("  ").count();
+    // Away from the table (the demo link sits in the corner over it).
+    h.input_mut().events.push(Event::PointerMoved(egui::pos2(100.0, 400.0)));
+    settle(&mut h);
     let base = arrows(&h);
     // The "Stand" cell of row 3 (x 688..756, rows 28 px from y 157).
     let cell = egui::pos2(720.0, 171.0 + 28.0 * 3.0);
@@ -456,7 +537,7 @@ fn choice_menu_button_stays_when_the_pointer_moves_onto_it() {
 fn stage_plot_editor() {
     use bp_core::plans::PlanKind;
     let mut h = harness();
-    h.get_by_label_contains("demo band show").click();
+    h.get_by_label_contains("Demo band show").click();
     settle(&mut h);
     // The nav is taller than the test window: go there directly.
     let plan = project(&h).plans[0].id;
@@ -521,7 +602,7 @@ fn stage_plot_editor() {
 #[test]
 fn other_plans() {
     let mut h = harness();
-    h.get_by_label_contains("demo band show").click();
+    h.get_by_label_contains("Demo band show").click();
     settle(&mut h);
     let plans: Vec<(bp_core::model::Id, String)> = project(&h).plans.iter().map(|p| (p.id, p.name.clone())).collect();
     for (id, name) in &plans[1..] {
@@ -551,8 +632,7 @@ fn other_plans() {
 #[test]
 fn import_rows_and_export_csv() {
     let mut h = harness();
-    h.get_by_label("New project").click();
-    settle(&mut h);
+    new_project(&mut h, "Test Show");
     open_sheet(&mut h, Sheet::Cast);
     let dir = tempfile::tempdir().unwrap();
     let file = dir.path().join("cast.csv");
@@ -599,7 +679,7 @@ fn import_rows_and_export_csv() {
 fn production_pack_and_exchange_file() {
     use bp_print::Doc;
     let mut h = harness();
-    h.get_by_label_contains("demo band show").click();
+    h.get_by_label_contains("Demo band show").click();
     settle(&mut h);
     h.state_mut().page = Page::Print;
     settle(&mut h);

@@ -1,5 +1,17 @@
 # Changelog
 
+## 0.2.0
+
+- New start screen in the style of the other suite apps: a blueprint backdrop with a stage plan,
+  big cards for New project and Open project (and Recover, when an untitled project was not saved),
+  recently opened projects with their folder and date (missing ones are marked, the list can be
+  cleared). The demos moved to the corner at the bottom.
+- New project asks for the production name and a location (Documents/Blueprint by default) and makes
+  a folder of its own with the project file in it, saved right away.
+- File menu: Start screen, New project, Open, Open recent, Save, Save as, Close project.
+- `.blueprint` files open when dropped on the window or opened from Finder (macOS) while Blueprint
+  is running.
+
 ## 0.1.0
 
 - Import and export (M6): every table imports rows from CSV, TSV, text (UTF-8, UTF-16 or Windows-1252,

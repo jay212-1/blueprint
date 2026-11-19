@@ -12,9 +12,6 @@ several locations and more, all printable as PDF. Rust + egui, built like the ot
 
 ## Version and changelog with every change
 
-**Exception for now:** while the milestones of the first Blueprint prompt (M2–M6) are being built,
-the version stays at 0.1.0 and new items go into the `## 0.1.0` section (Jan's wish, 2026-11-19).
-
 - Every change raises the version in the root `Cargo.toml` (`[workspace.package] version`), then
   `cargo update -w` so `Cargo.lock` follows. Small changes: patch step; bigger features: minor step.
 - Add a `## x.y.z` section at the top of `CHANGELOG.md` (English).
@@ -58,7 +55,7 @@ Showtime Suite installs, updates and starts the others; its catalog is `showtime
   (`docs/blueprint/exchange-format.md`).
 - `crates/bp-print` – Typst printing: `templates/*.typ` (layout and themes, kept apart from the
   code; `setlist.typ` fits the type to one page, `plan.typ` the other plans and the stage plot, `package.typ` the cover of the production pack), `fonts/` (OFL, embedded), `data.rs` (plans to JSON for the templates).
-- `crates/blueprint` – the egui app: `app.rs` (window, project actions), `app_*.rs` (pages; `app_stage.rs` the stage plot editor, `app_import.rs` import / CSV export),
+- `crates/blueprint` – the egui app: `app.rs` (window, project actions), `app_*.rs` (pages; `app_stage.rs` the stage plot editor, `app_import.rs` import / CSV export, `app_start.rs` the start screen and the new-project form, `open_files*.rs` files handed over by macOS),
   `table.rs` (reusable spreadsheet editor that emits `Action`s), `theme.rs` (suite colours),
   `settings.rs` (`BLUEPRINT_CONFIG_DIR` redirects them; tests never touch the real settings).
 - `packaging/`, `release.sh`, `install-mac.sh`, `install.sh` – as in Lantern.
