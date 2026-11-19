@@ -521,6 +521,9 @@ pub struct MicView {
     pub txs: Vec<Id>,
     /// `cells[scene][column]`: who wears that transmitter in the scene.
     pub cells: Vec<Vec<Vec<Wear>>>,
+    /// `off[scene][column]`: the transmitter stays on this person between two
+    /// of their scenes, but they are off stage (the channel is down).
+    pub off: Vec<Vec<Option<Wear>>>,
     pub swaps: Vec<Swap>,
     pub problems: Vec<Problem>,
     pub times: Vec<(Option<f64>, Option<f64>)>,
@@ -603,7 +606,8 @@ impl MicView {
 
         // Swaps: the wearer of a transmitter changes between two uses.
         let mut swaps = Vec::new();
-        for &tx in &txs {
+        let mut off: Vec<Vec<Option<Wear>>> = vec![vec![None; txs.len()]; p.scenes.len()];
+        for (ci, &tx) in txs.iter().enumerate() {
             let mut last: Option<(usize, Wear)> = None;
             for (si, m) in wear.iter().enumerate() {
                 let Some(w) = m.get(&tx).and_then(|w| w.first()).copied() else {
@@ -614,7 +618,11 @@ impl MicView {
                         (Some(a), Some(b)) => a == b,
                         _ => lw.role == w.role,
                     };
-                    if !same {
+                    if same {
+                        for row in off.iter_mut().take(si).skip(li + 1) {
+                            row[ci] = Some(lw);
+                        }
+                    } else {
                         let window = match (times[li].1, times[si].0) {
                             (Some(end), Some(start)) => Some((start - end).max(0.0)),
                             _ => None,
@@ -643,7 +651,7 @@ impl MicView {
             .iter()
             .map(|m| txs.iter().map(|t| m.get(t).cloned().unwrap_or_default()).collect())
             .collect();
-        MicView { txs, cells, swaps, problems, times }
+        MicView { txs, cells, off, swaps, problems, times }
     }
 
     pub fn column_of(&self, tx: Id) -> Option<usize> {
@@ -699,6 +707,16 @@ pub fn cell_key(scene: Id, tx: Id) -> String {
 }
 
 /// "Mara, Lena (B)".
+/// The colour of a cell: the performer's, else the role's.
+pub fn wear_color(p: &Project, w: &Wear) -> String {
+    w.person
+        .and_then(|i| p.person(i))
+        .map(|x| x.color.clone())
+        .filter(|c| !c.is_empty())
+        .or_else(|| p.role(w.role).map(|r| r.color.clone()))
+        .unwrap_or_default()
+}
+
 pub fn wears_text(p: &Project, w: &[Wear]) -> String {
     w.iter()
         .map(|x| {

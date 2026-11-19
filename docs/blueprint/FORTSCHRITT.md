@@ -164,3 +164,10 @@ Suite wandert (damit Show Master es direkt liest), entscheiden wir noch.
 - `.blueprint`-Dateien öffnen per Drag & Drop aufs Fenster und aus dem Finder bei laufendem Programm.
 - Ab jetzt steigt die Version mit jeder Änderung.
 - Tests: 18 UI-Tests (neu: Formular, Ordner, Recent, File-Menü, Drag & Drop).
+
+## 0.2.1 – Stimmlage und On/Off stage im Mic Plot (2026-11-19) ✅
+
+- Cast hat die Spalte „Vocal range“ (Import erkennt „Stimmlage“, „Range“, „Voice“), gedruckt auf den Mic-Cards.
+- Mic Plot: kräftige Zellen = auf der Bühne; blasse Zelle mit Farbbalken und Rollenname = hinter der
+  Bühne, trägt den Sender weiter (Kanal zu). In der App und im Druck (mit Legende).
+- Tests: 65 Kern-Tests (neu: Off-stage-Spuren), 8 Druck-Tests, 18 UI-Tests.

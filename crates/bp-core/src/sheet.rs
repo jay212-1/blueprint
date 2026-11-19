@@ -288,6 +288,7 @@ impl Sheet {
             Sheet::Cast => vec![
                 col("Name", Text, 180.0),
                 col("Short", Text, 70.0),
+                col("Vocal range", Text, 130.0),
                 col("Contact", Text, 200.0),
                 col("Notes", Text, 260.0),
                 col("Colour", Color, 90.0),
@@ -378,9 +379,10 @@ impl Sheet {
             Sheet::Cast => p.cast.get(row).map(|r| match column {
                 0 => r.name.clone(),
                 1 => r.short.clone(),
-                2 => r.contact.clone(),
-                3 => r.notes.clone(),
-                4 => color_text(&r.color),
+                2 => r.vocal_range.clone(),
+                3 => r.contact.clone(),
+                4 => r.notes.clone(),
+                5 => color_text(&r.color),
                 _ => String::new(),
             }),
             Sheet::Roles => p.roles.get(row).map(|r| match column {
@@ -444,14 +446,15 @@ impl Sheet {
         let v = value.trim_end_matches(['\r', '\n']);
         match self {
             Sheet::Cast => {
-                let color = if column == 4 { parse_color(v)? } else { String::new() };
+                let color = if column == 5 { parse_color(v)? } else { String::new() };
                 let r = &mut p.cast[row];
                 match column {
                     0 => r.name = v.trim().to_string(),
                     1 => r.short = v.trim().to_string(),
-                    2 => r.contact = v.to_string(),
-                    3 => r.notes = v.to_string(),
-                    4 => r.color = color,
+                    2 => r.vocal_range = v.trim().to_string(),
+                    3 => r.contact = v.to_string(),
+                    4 => r.notes = v.to_string(),
+                    5 => r.color = color,
                     _ => {}
                 }
             }
@@ -673,9 +676,11 @@ mod tests {
         assert_eq!(Sheet::Scenes.text(&p, r, 4), "12:30");
         assert!(Sheet::Scenes.set(&mut p, r, 5, "soon").is_err());
         let c = Sheet::Cast.insert(&mut p, 0);
-        assert!(Sheet::Cast.set(&mut p, c, 4, "Pink").is_err());
-        Sheet::Cast.set(&mut p, c, 4, "Blue").unwrap();
+        assert!(Sheet::Cast.set(&mut p, c, 5, "Pink").is_err());
+        Sheet::Cast.set(&mut p, c, 5, "Blue").unwrap();
+        Sheet::Cast.set(&mut p, c, 2, " Mezzo ").unwrap();
+        assert_eq!(Sheet::Cast.text(&p, c, 2), "Mezzo");
         assert_eq!(Sheet::Cast.color(&p, c), "blue");
-        assert_eq!(copy(&Sheet::Cast, &p, &[c]), "\t\t\t\tblue");
+        assert_eq!(copy(&Sheet::Cast, &p, &[c]), "\t\tMezzo\t\t\tblue");
     }
 }

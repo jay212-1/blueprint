@@ -16,7 +16,18 @@
     ..block.rows.map(r => (
       mono(r.no),
       [#r.title #if r.warn != "" { text(fill: red, size: th.small)[\ #r.warn] }],
-      ..r.cells.map(c => table.cell(
+      ..r.cells.map(c => if c.off {
+        // Off stage, still wearing the transmitter: a faint cell with a bar.
+        let t = tint(c.color)
+        table.cell(
+          fill: if t == none { none } else { t.lighten(65%) },
+          stroke: (
+            left: 2.2pt + if t == none { luma(165) } else { t.darken(25%) },
+            rest: if c.changed { 1.4pt + black } else { 0.4pt + th.line },
+          ),
+          align: center + horizon,
+        )[#text(size: th.small, fill: th.muted, c.text)]
+      } else { table.cell(
         fill: tint(c.color),
         stroke: if c.changed { 1.4pt + black } else { 0.4pt + th.line },
         align: center + horizon,
@@ -24,7 +35,7 @@
         #set text(size: 0.92em)
         #if c.swap { text(fill: th.muted)[→ ] }#if c.changed { strong(c.text) } else { c.text }
         #if c.who != "" { linebreak(); text(size: th.small, fill: th.muted, c.who) }
-      ]),
+      ]}),
     )).flatten(),
   )
 }

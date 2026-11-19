@@ -140,6 +140,8 @@ pub struct Person {
     pub name: String,
     /// Short name for tight plans ("AL").
     pub short: String,
+    /// "Soprano", "Baritone (A2-G4)" …
+    pub vocal_range: String,
     pub contact: String,
     /// E.g. "allergic to tape", "wears a wig".
     pub notes: String,

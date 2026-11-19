@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.2.1
+
+- Cast: a "Vocal range" column (soprano, baritone …); it is matched on import ("Stimmlage",
+  "Range", "Voice") and printed on the mic cards. The demo musical has ranges for its cast.
+- Mic plot: who is on stage when. Bright cells are scenes on stage; between two scenes of the same
+  performer the transmitter's cell stays faint with a coloured bar and the role name: off stage, still
+  wearing the transmitter (channel down). The same in the printed mic plot, with a line in its legend.
+
 ## 0.2.0
 
 - New start screen in the style of the other suite apps: a blueprint backdrop with a stage plan,

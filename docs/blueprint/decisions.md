@@ -45,3 +45,5 @@
 - 2026-11-19: Startbildschirm und Dateiverwaltung wie Show Master: prozeduraler Hintergrund (Blaupause mit Bühnenplan), Karten für Neu/Öffnen, Liste „Recent“, Demos klein in der Ecke unten rechts; File-Menü mit Open recent.
 - 2026-11-19: Ein neues Projekt bekommt einen eigenen Ordner (`<Ort>/<Name>/<Name>.blueprint`, Standard Dokumente/Blueprint) und wird sofort gespeichert; der zuletzt gewählte Ort wird gemerkt.
 - 2026-11-19: Ab 0.2.0 wird die Version bei jeder Änderung erhöht (die Ausnahme „bleibt 0.1.0“ ist vorbei).
+- 2026-11-19: Stimmlage als freier Text am Cast (Spalte nach „Short“), auf den Mic-Cards gedruckt.
+- 2026-11-19: Mic Plot zeigt „off stage, trägt den Sender“ nur zwischen zwei Szenen derselben Person auf demselben Sender (`MicView.off`); vor dem ersten und nach dem letzten Auftritt sowie zwischen zwei verschiedenen Trägern (Swap) bleibt die Zelle leer.

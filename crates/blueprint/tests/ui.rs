@@ -645,7 +645,7 @@ fn import_rows_and_export_csv() {
     {
         let st = h.state_mut().import.as_mut().unwrap();
         assert!(st.header);
-        assert_eq!(st.map, vec![Some(0), Some(1), Some(3), Some(4)]);
+        assert_eq!(st.map, vec![Some(0), Some(1), Some(4), Some(5)]);
     }
     settle(&mut h);
     h.get_by_label("Import 2 rows").click();

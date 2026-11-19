@@ -4,7 +4,7 @@
 //! [`MicView`] built for the project as it is now.
 
 use crate::grid::{col, CellMark, ColKind, Column, Grid};
-use crate::mic::{
+use crate::mic::{wear_color, 
     dca_channels, dca_text, parse_dca, performer, tx_label, tx_named, wears_text, MicView,
     Problem, VariantCast, POSITIONS,
 };
@@ -56,7 +56,7 @@ impl MicSheet {
     /// One line under the heading.
     pub fn help(self) -> &'static str {
         match self {
-            MicSheet::Plot => "Who wears which transmitter in each scene. Type role names into a cell to put them on that transmitter for the scene; set the usual transmitter in \"Transmitters per role\".",
+            MicSheet::Plot => "Who wears which transmitter in each scene. Bright: on stage; faint with a line: off stage but still wearing it (channel down). Type role names into a cell to put them on that transmitter for the scene; set the usual transmitter in \"Transmitters per role\".",
             MicSheet::Tracks => "The transmitter each role normally wears (and a second one for A/B miking). Exceptions are typed into the mic plot.",
             MicSheet::Performers => "Capsule and where it sits, per performer. The transmitters follow from the plan.",
             MicSheet::Swaps => "Every time a transmitter changes hands, with the time there is. Note where and who swaps it.",
@@ -656,9 +656,19 @@ impl Grid for MicGrid<'_> {
                     hint.extend(probs.iter().map(|x| x.message(p)));
                 }
                 if wears.is_empty() && hint.is_empty() {
-                    return None;
+                    let w = self.view.off.get(row)?.get(ci)?.as_ref()?;
+                    let person = w.person.and_then(|i| p.person(i));
+                    return Some(CellMark {
+                        color: wear_color(p, w),
+                        ghost: wears_text(p, std::slice::from_ref(w)),
+                        hint: format!(
+                            "Off stage: {} keeps the transmitter on (channel down)",
+                            person.map(|x| x.name.clone()).or_else(|| p.role(w.role).map(|r| r.name.clone())).unwrap_or_default()
+                        ),
+                        ..CellMark::default()
+                    });
                 }
-                Some(CellMark { color, warn, hint: hint.join("\n") })
+                Some(CellMark { color, warn, hint: hint.join("\n"), ..CellMark::default() })
             }
             MicSheet::Dca => {
                 let scene = p.scenes.get(row)?;
@@ -733,6 +743,30 @@ mod tests {
             p.scenes.push(Scene { id, number: n.into(), ..Scene::default() });
         }
         p
+    }
+
+    #[test]
+    fn off_stage_between_scenes_keeps_the_mic() {
+        let p = crate::demo::musical();
+        let v = MicView::build(&p);
+        let g = MicGrid { sheet: MicSheet::Plot, view: &v };
+        // Mara (TX 1) is on in 1.1, off in 1.2, on again in 1.3.
+        let mara = p.roles[0].id;
+        assert_eq!(g.text(&p, 1, 2), "");
+        assert_eq!(v.off[1][0].map(|w| w.role), Some(mara));
+        let m = g.mark(&p, 1, 2).unwrap();
+        assert_eq!(m.ghost, "Mara");
+        assert!(m.hint.contains("Off stage"));
+        // On stage: no ghost; before the first scene of a transmitter: nothing.
+        assert!(g.mark(&p, 0, 2).unwrap().ghost.is_empty());
+        assert!(v.off[0].iter().all(Option::is_none));
+        // Between two different wearers (a swap) nothing is marked.
+        for s in &v.swaps {
+            let ci = v.column_of(s.tx).unwrap();
+            for row in s.after + 1..s.before {
+                assert!(v.off[row][ci].is_none());
+            }
+        }
     }
 
     #[test]

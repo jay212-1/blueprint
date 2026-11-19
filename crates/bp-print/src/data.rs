@@ -1,7 +1,7 @@
 //! The plans as data for the templates (one JSON object per print).
 
 use crate::{Doc, Options};
-use bp_core::mic::{
+use bp_core::mic::{wear_color, 
     cell_key, dca_channels, performer, tx_label, wears_text, MicView, Problem,
 };
 use bp_core::mic_grid::capsule_label;
@@ -105,11 +105,11 @@ fn mic_plot(p: &Project, view: &MicView, opts: &Options, d: &mut Value) -> Value
     };
     if !changed.is_empty() {
         d["legend"] = json!(format!(
-            "Bold frame: changed since Rev {}. → a transmitter changes hands before this scene.",
+            "Bold frame: changed since Rev {}. Faint cell with a bar: off stage, still wearing the transmitter. → a transmitter changes hands before this scene.",
             p.mic.revision.number.saturating_sub(1)
         ));
     } else {
-        d["legend"] = json!("→ a transmitter changes hands before this scene.");
+        d["legend"] = json!("Faint cell with a bar: off stage, still wearing the transmitter. → a transmitter changes hands before this scene.");
     }
     // As many blocks as needed, the transmitters spread evenly over them.
     let max = plot_columns(opts);
@@ -142,21 +142,29 @@ fn mic_plot(p: &Project, view: &MicView, opts: &Options, d: &mut Value) -> Value
                         .enumerate()
                         .map(|(k, tx)| {
                             let w = &view.cells[si][first + k];
+                            if w.is_empty() {
+                                if let Some(o) = view.off.get(si).and_then(|r| r.get(first + k)).and_then(|o| o.as_ref()) {
+                                    return json!({
+                                        "text": wears_text(p, std::slice::from_ref(o)),
+                                        "who": "",
+                                        "color": wear_color(p, o),
+                                        "off": true,
+                                        "swap": false,
+                                        "changed": changed.contains(&cell_key(s.id, *tx)),
+                                    });
+                                }
+                            }
                             let who: Vec<String> = w
                                 .iter()
                                 .filter_map(|x| x.person.and_then(|i| p.person(i)))
                                 .map(|x| if x.short.is_empty() { x.name.clone() } else { x.short.clone() })
                                 .collect();
-                            let color = w
-                                .first()
-                                .and_then(|x| x.person.and_then(|i| p.person(i)).map(|x| x.color.clone()))
-                                .filter(|c| !c.is_empty())
-                                .or_else(|| w.first().and_then(|x| p.role(x.role)).map(|r| r.color.clone()))
-                                .unwrap_or_default();
+                            let color = w.first().map(|x| wear_color(p, x)).unwrap_or_default();
                             json!({
                                 "text": wears_text(p, w),
                                 "who": who.join(", "),
                                 "color": color,
+                                "off": false,
                                 "swap": view.swap_at(si, *tx).is_some(),
                                 "changed": changed.contains(&cell_key(s.id, *tx)),
                             })
@@ -226,7 +234,7 @@ fn mic_cards(p: &Project, view: &MicView, opts: &Options) -> Value {
             json!({
                 "name": x.name,
                 "short": x.short,
-                "roles": roles.join(", "),
+                "roles": if x.vocal_range.trim().is_empty() { roles.join(", ") } else { format!("{}  ·  {}", roles.join(", "), x.vocal_range.trim()) },
                 "txs": txs,
                 "position": f.map(|f| f.position.clone()).unwrap_or_default(),
                 "swaps": swaps,

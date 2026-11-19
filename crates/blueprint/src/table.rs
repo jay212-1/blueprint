@@ -553,13 +553,31 @@ fn draw_row(
         let text = (view.text)(row, col);
         let mark = (view.mark)(row, col);
         let p = ui.painter();
+        // A ghost: faint colour and text in an empty cell, with a line
+        // that ties it to the cells above and below.
+        let ghost = mark.as_ref().filter(|m| !m.ghost.is_empty() && text.is_empty());
         if let Some(m) = &mark {
             if let Some(c) = theme::color(&m.color) {
-                p.rect_filled(cell.shrink(1.0), 2.0, c.gamma_multiply(0.28));
+                if ghost.is_some() {
+                    p.rect_filled(cell.shrink(1.0), 2.0, c.gamma_multiply(0.07));
+                    let x = cell.left() + 4.0;
+                    p.vline(x, cell.y_range(), Stroke::new(2.0, c.gamma_multiply(0.55)));
+                } else {
+                    p.rect_filled(cell.shrink(1.0), 2.0, c.gamma_multiply(0.28));
+                }
             }
             if m.warn {
                 p.rect_stroke(cell.shrink(2.0), 2.0, Stroke::new(1.5, theme::ERROR), StrokeKind::Inside);
             }
+        }
+        if let Some(m) = ghost {
+            p.with_clip_rect(cell.shrink(1.0)).text(
+                egui::pos2(cell.left() + PAD + 4.0, cell.center().y),
+                Align2::LEFT_CENTER,
+                &m.ghost,
+                FontId::proportional(12.0),
+                Color32::from_rgb(92, 98, 112),
+            );
         }
         let text_color = if view.fixed(col) && col > 0 { theme::MUTED } else { theme::TEXT };
         if view.columns[col].kind == ColKind::Color {

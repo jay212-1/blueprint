@@ -48,6 +48,9 @@ pub struct CellMark {
     pub warn: bool,
     /// Shown when the pointer rests on the cell.
     pub hint: String,
+    /// Faint text for an empty cell, with a faint colour (mic plot: still
+    /// wearing the transmitter, but off stage).
+    pub ghost: String,
 }
 
 pub trait Grid {

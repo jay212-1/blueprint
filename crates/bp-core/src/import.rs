@@ -208,6 +208,7 @@ const ALIASES: &[(&str, &[&str])] = &[
     ("source", &["instrument", "quelle"]),
     ("stand", &["stativ"]),
     ("short", &["kurz", "kürzel", "kuerzel", "abbr", "initials", "abbreviation"]),
+    ("vocalrange", &["range", "voice", "voicetype", "stimmlage", "stimme", "stimmumfang", "tessitura", "fach"]),
     ("48v", &["phantom", "p48"]),
     ("notes", &["note", "comment", "comments", "bemerkung", "notizen", "remarks"]),
     ("length", &["duration", "dauer", "time"]),

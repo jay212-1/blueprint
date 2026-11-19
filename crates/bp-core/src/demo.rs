@@ -48,6 +48,11 @@ pub fn musical() -> Project {
         });
         pid.push(id);
     }
+    // Vocal ranges, in the order of the cast.
+    let ranges = ["Soprano", "Tenor", "Baritone", "Mezzo-soprano", "Bass-baritone", "Soprano", "Soprano", "Tenor", "Alto", "Baritone", "Mezzo-soprano", "Tenor / baritone"];
+    for (x, r) in p.cast.iter_mut().zip(ranges) {
+        x.vocal_range = r.into();
+    }
 
     // Role, lead (index into people), others.
     type RoleRow<'a> = (&'a str, usize, &'a [(usize, CastKind)]);
