@@ -547,3 +547,88 @@ fn other_plans() {
     assert_eq!(project(&h).plans.len(), 6);
     assert_eq!(h.state().page, Page::Production);
 }
+
+#[test]
+fn import_rows_and_export_csv() {
+    let mut h = harness();
+    h.get_by_label("New project").click();
+    settle(&mut h);
+    open_sheet(&mut h, Sheet::Cast);
+    let dir = tempfile::tempdir().unwrap();
+    let file = dir.path().join("cast.csv");
+    // Excel in Germany: semicolons, Windows-1252.
+    std::fs::write(&file, b"Name;K\xfcrzel;Notizen;Farbe\r\nJ\xf6rg Weiss;JW;Ensemble;blue\r\nAnna Berg;AB;Lead;pink\r\n").unwrap();
+    assert!(h.state_mut().start_import(&Sheet::Cast, &file));
+    settle(&mut h);
+    shot(&mut h, "import-cast");
+    // German titles are matched too; "Contact" is not in the file.
+    {
+        let st = h.state_mut().import.as_mut().unwrap();
+        assert!(st.header);
+        assert_eq!(st.map, vec![Some(0), Some(1), Some(3), Some(4)]);
+    }
+    settle(&mut h);
+    h.get_by_label("Import 2 rows").click();
+    settle(&mut h);
+    assert!(h.state().import.is_none());
+    let cast = &project(&h).cast;
+    assert_eq!(cast.len(), 2);
+    assert_eq!(cast[0].name, "Jörg Weiss");
+    assert_eq!(cast[0].short, "JW");
+    assert_eq!(cast[0].notes, "Ensemble");
+    // "pink" is no colour: the row is there, the value is reported.
+    let msg = h.state().message_text().unwrap_or_default().to_string();
+    assert!(msg.contains("Row 3, Colour"), "{msg}");
+    shot(&mut h, "import-report");
+    h.get_by_label("OK").click();
+    settle(&mut h);
+    // One undo step takes the whole import back.
+    key(&mut h, Key::Z, Modifiers::COMMAND);
+    assert!(project(&h).cast.is_empty());
+    key(&mut h, Key::Z, Modifiers::COMMAND | Modifiers::SHIFT);
+    assert_eq!(project(&h).cast.len(), 2);
+
+    let csv = dir.path().join("out.csv");
+    assert!(h.state_mut().export_csv(&Sheet::Cast, &csv));
+    let text = std::fs::read_to_string(&csv).unwrap();
+    assert!(text.starts_with("\u{feff}Name,"), "{text}");
+    assert!(text.contains("Jörg Weiss,JW"));
+}
+
+#[test]
+fn production_pack_and_exchange_file() {
+    use bp_print::Doc;
+    let mut h = harness();
+    h.get_by_label_contains("demo band show").click();
+    settle(&mut h);
+    h.state_mut().page = Page::Print;
+    settle(&mut h);
+    h.get_by_label("Production pack").click();
+    settle(&mut h);
+    assert_eq!(h.state().print.doc, Doc::Package);
+    shot(&mut h, "print-pack");
+    let all = {
+        let s = h.state();
+        s.pack(&s.doc.as_ref().unwrap().project).len()
+    };
+    // Leave the guest list out.
+    h.get_by_role_and_label(egui::accesskit::Role::CheckBox, "Guest list").click();
+    settle(&mut h);
+    let s = h.state();
+    let pack = s.pack(&s.doc.as_ref().unwrap().project);
+    assert_eq!(pack.len(), all - 1);
+    let dir = tempfile::tempdir().unwrap();
+    let pdf = dir.path().join("pack.pdf");
+    assert!(h.state_mut().export_pdf(Doc::Package, &pdf));
+    assert!(std::fs::read(&pdf).unwrap().starts_with(b"%PDF"));
+
+    let file = dir.path().join("band.showtime.json");
+    assert!(h.state_mut().export_exchange(&file));
+    let x = bp_core::exchange::read(&std::fs::read_to_string(&file).unwrap()).unwrap();
+    assert_eq!(x.production.name, "Northbound Static");
+    assert_eq!(x.inputs.len(), 26);
+    h.state_mut().page = Page::Production;
+    settle(&mut h);
+    shot(&mut h, "production-exchange");
+    assert!(h.query_by_label("Export exchange file…").is_some());
+}

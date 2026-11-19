@@ -37,3 +37,8 @@
 - 2026-11-19: Stageplot-Koordinaten in Metern, Ursprung hinten links, Publikum unten; Ziehen rastet beim Loslassen auf das Raster ein.
 - 2026-11-19: Packliste: Zeilen „From Patch / Mic plan“ werden beim Neuzählen ersetzt (Gruppe, Was, Anzahl gesperrt), Gepackt-Häkchen, Case und Notizen bleiben; eigene Zeilen werden nie angefasst.
 - 2026-11-19: Plan-Drucke bauen ihre Tabellen generisch aus dem `Grid` des Plans (Farbspalten werden Zeilentönung, Checkbox-Spalten gezeichnete Kästchen).
+- 2026-11-19: Import geht in jede Tabelle über ihr `Grid` (einfügen + `set` pro Zelle), damit ein Import wie Eintippen prüft; Zeilen kommen ans Ende, ein Undo-Schritt nimmt alles zurück.
+- 2026-11-19: Spalten werden über Titel zugeordnet (genau, dann bekannte andere Wörter auch auf Deutsch, dann Anfang); ohne Titelzeile in der Reihenfolge der Tabelle wie beim Einfügen.
+- 2026-11-19: Tabellendateien liest calamine (XLSX/XLS/ODS, ohne chrono); Text wird als UTF-8, UTF-16 mit BOM oder sonst Windows-1252 gelesen. CSV-Export mit BOM, damit Excel Umlaute richtig zeigt.
+- 2026-11-19: Production pack: jede Druckvorlage wird einzeln gesetzt, die Seiten werden zu einem Typst-Dokument zusammengefügt; das Deckblatt wird zweimal gesetzt, falls das Inhaltsverzeichnis mehr als eine Seite braucht. Seitenzahlen im Fuß bleiben pro Druck, das Inhaltsverzeichnis nennt die Seiten des ganzen PDFs.
+- 2026-11-19: Austauschformat `showtime-exchange` Version 1 als JSON ohne Blueprint-IDs (Bezug über Kanalnummern und Namen); Leser ignorieren unbekannte Felder und lehnen höhere Versionen ab. Es liegt vorerst in bp-core; ein gemeinsames Crate für die Suite schlage ich separat vor.

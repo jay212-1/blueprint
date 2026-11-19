@@ -214,3 +214,22 @@ fn every_plan_prints_in_every_theme() {
     let titles: Vec<&str> = d.get()["sections"].as_array().unwrap().iter().map(|s| s["title"].as_str().unwrap()).collect();
     assert_eq!(titles, ["Band", "Crew", "Venue", "Promoter"]);
 }
+
+#[test]
+fn production_pack() {
+    let p = bp_core::demo::band();
+    let docs = bp_print::default_package(&p);
+    assert!(docs.contains(&Doc::InputList) && !docs.contains(&Doc::Labels));
+    assert!(!docs.contains(&Doc::MicPlot), "the band has no mic plan");
+    let items: Vec<(Doc, Options)> = docs.iter().map(|d| (*d, bp_print::options_for(&p, *d))).collect();
+    let single: usize = items.iter().map(|(d, o)| print(&p, *d, o).unwrap().pages()).sum();
+    let pack = bp_print::print_package(&p, &items, &Options::for_doc(Doc::Package)).unwrap();
+    assert_eq!(pack.pages(), single + 1, "a one-page cover, then every print");
+    assert!(pack.pdf().unwrap().starts_with(b"%PDF"));
+    out("Package-band", &pack);
+    // The musical has a mic plan.
+    let m = musical();
+    assert!(bp_print::default_package(&m).contains(&Doc::MicPlot));
+    let pack = print(&m, Doc::Package, &Options::for_doc(Doc::Package)).unwrap();
+    assert!(pack.pages() > 3);
+}

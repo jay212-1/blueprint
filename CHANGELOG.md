@@ -2,6 +2,14 @@
 
 ## 0.1.0
 
+- Import and export (M6): every table imports rows from CSV, TSV, text (UTF-8, UTF-16 or Windows-1252,
+  the delimiter is guessed) and spreadsheets (XLSX, XLS, ODS). The columns are matched by their
+  titles (English and German) and can be changed before importing; values that do not fit are
+  listed, and one undo takes the import back. Every table exports as CSV.
+- Production pack: a cover with the contents and the chosen prints (each with its own paper and
+  theme) in one PDF.
+- Exchange file for the live tools of the Showtime Suite (`.showtime.json`, version 1): channel
+  names, patch, mic plan per scene and DCAs. Described in `docs/blueprint/exchange-format.md`.
 - More plans (M5): stage plot (symbol library, grid, snap, drag, turn, inputs linked to the patch with
   channel badges, PNG export), run of show (times follow on), contacts (add the cast), packing list
   (counted from patch and mic plan, packed marks kept), intercom / radio (channels, who talks or

@@ -32,6 +32,8 @@ pub enum Doc {
     Setlist(bp_core::model::Id),
     /// One of the other plans (by id).
     Plan(bp_core::model::Id),
+    /// A cover with contents and the chosen prints in one PDF.
+    Package,
 }
 
 impl Doc {
@@ -71,6 +73,7 @@ impl Doc {
             Doc::Labels => "Labels and scribble strips",
             Doc::Setlist(_) => "Setlist",
             Doc::Plan(_) => "Plan",
+            Doc::Package => "Production pack",
         }
     }
 
@@ -86,6 +89,7 @@ impl Doc {
             Doc::Setlist(_) => "setlist.typ",
             Doc::Labels => "labels.typ",
             Doc::Plan(_) => "plan.typ",
+            Doc::Package => "package.typ",
             _ => "table.typ",
         }
     }
@@ -236,7 +240,8 @@ impl Options {
     }
 }
 
-const TEMPLATES: [(&str, &str); 7] = [
+const TEMPLATES: [(&str, &str); 8] = [
+    ("package.typ", include_str!("../templates/package.typ")),
     ("plan.typ", include_str!("../templates/plan.typ")),
     ("labels.typ", include_str!("../templates/labels.typ")),
     ("setlist.typ", include_str!("../templates/setlist.typ")),
@@ -317,8 +322,85 @@ impl Printed {
     }
 }
 
+/// The prints that have something in them for this project, in the
+/// order of a production pack.
+pub fn available(p: &bp_core::model::Project) -> Vec<Doc> {
+    let mut out = Vec::new();
+    if !p.transmitters.is_empty() && !p.scenes.is_empty() {
+        out.extend(Doc::MIC);
+    }
+    if !p.patch.inputs.is_empty() || !p.patch.outputs.is_empty() {
+        out.extend(Doc::PATCH);
+    }
+    out.extend(p.setlists.iter().map(|s| Doc::Setlist(s.id)));
+    out.extend(p.plans.iter().map(|x| Doc::Plan(x.id)));
+    out
+}
+
+/// What a production pack holds unless chosen otherwise: everything but
+/// the prints that are cut up (mic cards, labels).
+pub fn default_package(p: &bp_core::model::Project) -> Vec<Doc> {
+    available(p).into_iter().filter(|d| !matches!(d, Doc::MicCards | Doc::Labels)).collect()
+}
+
+/// The name of a print in this project (a setlist's or plan's own name).
+pub fn doc_name(p: &bp_core::model::Project, doc: Doc) -> String {
+    let named = match doc {
+        Doc::Setlist(id) => p.setlist(id).map(|s| s.name.trim().to_string()),
+        Doc::Plan(id) => p.plan(id).map(|x| if x.name.trim().is_empty() { x.kind.plan_type().label().to_string() } else { x.name.trim().to_string() }),
+        _ => None,
+    };
+    named.filter(|n| !n.is_empty()).unwrap_or_else(|| doc.title().to_string())
+}
+
+/// A production pack: a cover with the contents, then every print with
+/// its own options, in one document.
+pub fn print_package(p: &bp_core::model::Project, items: &[(Doc, Options)], opts: &Options) -> Result<Printed, String> {
+    let mut parts = Vec::new();
+    let mut warnings = Vec::new();
+    for (doc, o) in items.iter().filter(|(d, _)| *d != Doc::Package) {
+        let printed = print(p, *doc, o).map_err(|e| format!("{}: {e}", doc_name(p, *doc)))?;
+        warnings.extend(printed.warnings.iter().map(|w| format!("{}: {w}", doc_name(p, *doc))));
+        parts.push((*doc, printed));
+    }
+    // The cover twice: the second time with the page numbers it makes room for.
+    let mut cover_pages = 1;
+    let mut cover = None;
+    for _ in 0..2 {
+        let mut page = cover_pages + 1;
+        let entries: Vec<serde_json::Value> = parts
+            .iter()
+            .map(|(d, pr)| {
+                let first = page;
+                page += pr.pages();
+                let pages = if pr.pages() > 1 { format!("{first}-{}", page - 1) } else { first.to_string() };
+                serde_json::json!({ "title": doc_name(p, *d), "kind": d.title(), "pages": pages })
+            })
+            .collect();
+        let data = data::package(p, opts, entries, page - 1);
+        let c = compile(Doc::Package, &data)?;
+        let n = c.pages();
+        cover = Some(c);
+        if n == cover_pages {
+            break;
+        }
+        cover_pages = n;
+    }
+    let cover = cover.ok_or("the cover could not be laid out")?;
+    let mut pages: typst::ecow::EcoVec<typst_layout::Page> = cover.doc.pages().iter().cloned().collect();
+    for (_, pr) in &parts {
+        pages.extend(pr.doc.pages().iter().cloned());
+    }
+    let info = typst::model::Document::info(&cover.doc).clone();
+    Ok(Printed { doc: PagedDocument::new(pages, info), warnings, fit: None })
+}
+
 /// Lay out `doc` for the project.
 pub fn print(p: &bp_core::model::Project, doc: Doc, opts: &Options) -> Result<Printed, String> {
+    if doc == Doc::Package {
+        let items: Vec<(Doc, Options)> = default_package(p).into_iter().map(|d| (d, options_for(p, d))).collect();
+        return print_package(p, &items, opts);
+    }
     let data = build(p, doc, opts);
     let logo = match doc {
         Doc::Setlist(id) => p.setlist(id).and_then(|s| s.logo_bytes()).filter(|b| is_image(b)),

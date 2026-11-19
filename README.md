@@ -4,8 +4,8 @@ Planning for live shows, part of the Showtime Suite: mic plots for theatre and m
 patch plans across several locations and more – everything printable as a clean PDF. Written in Rust
 (egui), for macOS, Windows and Linux.
 
-**Status: 0.1, in progress.** Projects, master data, the mic plan, setlists, the patch, the other plans
-and their prints work; import / export and the first release follow (see `docs/blueprint/FORTSCHRITT.md`).
+**Status: 0.1, in progress.** Projects, master data, the mic plan, setlists, the patch, the other plans,
+their prints, import and export work; the first release follows (see `docs/blueprint/FORTSCHRITT.md`).
 
 - **One project file** (`.blueprint`) per production: production data, cast, roles with their
   casting (lead, alternate, cover, swing), scenes, transmitters, capsules and locations. Plans refer
@@ -28,6 +28,10 @@ and their prints work; import / export and the first release follow (see `docs/b
 - **Prints:** mic plot, mic cards, swap list, frequency list, DCA sheet and battery plan as PDF
   (Typst with embedded fonts), A4 / A3 / Letter, themes for the stage, the tech desk or to save
   ink, revisions with change marks. Try the demo musical or the demo band show from the start page.
+- **Import and export:** rows into any table from CSV, TSV or spreadsheets (XLSX, XLS, ODS) with the
+  columns matched for you, any table out as CSV, a production pack (cover, contents and every print
+  in one PDF), stage plots as PNG, and an exchange file for Show Master and the other suite tools
+  ([format](docs/blueprint/exchange-format.md)).
 - **Safe:** undo / redo, atomic saving with backups, autosave every 20 seconds and recovery after a
   crash.
 

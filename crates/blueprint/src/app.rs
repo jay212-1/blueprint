@@ -77,6 +77,8 @@ pub struct App {
     /// The table shown for plans with two of them.
     pub(crate) plan_part: HashMap<Id, bp_core::plan_grid::Part>,
     pub stage: crate::app_stage::StageState,
+    /// An import waiting for its columns (shown above its table).
+    pub import: Option<crate::app_import::ImportState>,
 }
 
 impl App {
@@ -101,6 +103,7 @@ impl App {
             print: Default::default(),
             plan_part: HashMap::new(),
             stage: Default::default(),
+            import: None,
         };
         if let Some(p) = open {
             app.open_path(&p);
@@ -681,6 +684,19 @@ impl App {
                     });
             });
         ctx.request_repaint_after(Duration::from_millis(250));
+    }
+
+    /// Show a message the person has to close.
+    pub(crate) fn message(&mut self, text: String) {
+        self.modal = Some(Modal::Message(text));
+    }
+
+    /// The text of the message shown, if any (tests).
+    pub fn message_text(&self) -> Option<&str> {
+        match &self.modal {
+            Some(Modal::Message(t)) => Some(t),
+            _ => None,
+        }
     }
 
     /// Whether a modal dialog is open (tests).

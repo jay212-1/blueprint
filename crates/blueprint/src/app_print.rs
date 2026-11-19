@@ -19,6 +19,8 @@ const SETTLE: Duration = Duration::from_millis(350);
 
 pub struct PrintState {
     pub doc: Doc,
+    /// What the production pack holds (None: everything but cut sheets).
+    pub pack: Option<Vec<Doc>>,
     pub opts: HashMap<Doc, Options>,
     preview: Option<Preview>,
     /// What the preview should show, and since when.
@@ -29,6 +31,7 @@ impl Default for PrintState {
     fn default() -> Self {
         Self {
             doc: Doc::MicPlot,
+            pack: None,
             opts: HashMap::new(),
             preview: None,
             wanted: None,
@@ -84,6 +87,9 @@ impl App {
             .iter()
             .map(|s| (s.id, if s.name.trim().is_empty() { "Untitled setlist".into() } else { s.name.clone() }))
             .collect();
+        let available: Vec<(Doc, String)> = bp_print::available(&doc.project).into_iter().map(|d| (d, bp_print::doc_name(&doc.project, d))).collect();
+        let pack = self.pack(&doc.project);
+        let mut pack_changed = None;
         let current = self.print.doc;
         let mut opts = self.print.options(&doc.project, current);
         let mut pick = current;
@@ -95,6 +101,35 @@ impl App {
             .show(ui, |ui| {
                 egui::ScrollArea::vertical().auto_shrink([false, false]).show(ui, |ui| {
                     ui.heading("Print");
+                    ui.add_space(6.0);
+                    if ui
+                        .add(egui::Button::selectable(pick == Doc::Package, RichText::new("Production pack").strong()).min_size(egui::vec2(ui.available_width(), 28.0)))
+                        .on_hover_text("A cover with the contents and the prints you choose, in one PDF")
+                        .clicked()
+                    {
+                        pick = Doc::Package;
+                    }
+                    if pick == Doc::Package {
+                        ui.add_space(4.0);
+                        ui.label(RichText::new("IN THE PACK").small().color(theme::MUTED));
+                        let mut chosen = pack.clone();
+                        for (d, name) in &available {
+                            let mut on = chosen.contains(d);
+                            if ui.checkbox(&mut on, name.as_str()).changed() {
+                                if on {
+                                    chosen.push(*d);
+                                } else {
+                                    chosen.retain(|x| x != d);
+                                }
+                            }
+                        }
+                        // In the order of the list.
+                        chosen.sort_by_key(|d| available.iter().position(|(x, _)| x == d));
+                        if chosen != pack {
+                            pack_changed = Some(chosen);
+                        }
+                        ui.label(RichText::new("Each print keeps its own paper and theme; the cover takes the page and theme below.").small().color(theme::MUTED));
+                    }
                     ui.add_space(6.0);
                     ui.label(RichText::new("MIC PLAN").small().color(theme::MUTED));
                     for d in Doc::MIC {
@@ -194,6 +229,10 @@ impl App {
                 });
             });
 
+        if let Some(chosen) = pack_changed {
+            self.print.pack = Some(chosen);
+            self.print.preview = None;
+        }
         if pick != current {
             self.print.doc = pick;
             opts = self.doc.as_ref().map_or(opts, |d| self.print.options(&d.project, pick));
@@ -258,7 +297,7 @@ impl App {
         let mut pages = Vec::new();
         let mut warnings = Vec::new();
         let mut fit = None;
-        let (total, error) = match bp_print::print(&d.project, doc, &opts) {
+        let (total, error) = match self.printed(&d.project, doc, &opts) {
             Ok(printed) => {
                 for i in 0..printed.pages().min(MAX_PREVIEW_PAGES) {
                     if let Some((w, h, rgba)) = printed.render(i, 1.5) {
@@ -355,7 +394,7 @@ impl App {
     pub fn export_png(&mut self, doc: Doc, path: &Path) -> bool {
         let Some(d) = self.doc.as_ref() else { return false };
         let opts = self.print.options(&d.project, doc);
-        let r = bp_print::print(&d.project, doc, &opts)
+        let r = self.printed(&d.project, doc, &opts)
             .and_then(|p| p.png(0, 300.0 / 72.0).ok_or_else(|| "the page could not be drawn".to_string()))
             .and_then(|png| bp_core::project::atomic_write(path, &png).map_err(|e| e.to_string()));
         match r {
@@ -372,21 +411,28 @@ impl App {
 
     /// The document's name for file names ("Mic plot", the setlist's name).
     fn doc_name(&self, doc: Doc) -> String {
-        match doc {
-            Doc::Setlist(id) => self
-                .doc
-                .as_ref()
-                .and_then(|d| d.project.setlist(id))
-                .map(|s| s.name.trim().to_string())
-                .filter(|n| !n.is_empty())
-                .unwrap_or_else(|| "Setlist".into()),
-            Doc::Plan(id) => self
-                .doc
-                .as_ref()
-                .and_then(|d| d.project.plan(id))
-                .map(|p| if p.name.trim().is_empty() { p.kind.plan_type().label().to_string() } else { p.name.trim().to_string() })
-                .unwrap_or_else(|| "Plan".into()),
-            _ => doc.title().into(),
+        self.doc.as_ref().map_or_else(|| doc.title().to_string(), |d| bp_print::doc_name(&d.project, doc))
+    }
+
+    /// The prints in the production pack (those that still exist).
+    pub fn pack(&self, p: &bp_core::model::Project) -> Vec<Doc> {
+        let available = bp_print::available(p);
+        match &self.print.pack {
+            Some(v) => v.iter().copied().filter(|d| available.contains(d)).collect(),
+            None => bp_print::default_package(p),
+        }
+    }
+
+    /// Lay out a print (the production pack with the chosen prints).
+    fn printed(&self, p: &bp_core::model::Project, doc: Doc, opts: &Options) -> Result<bp_print::Printed, String> {
+        if doc == Doc::Package {
+            let items: Vec<(Doc, Options)> = self.pack(p).into_iter().map(|d| (d, self.print.options(p, d))).collect();
+            if items.is_empty() {
+                return Err("Choose at least one print for the pack.".into());
+            }
+            bp_print::print_package(p, &items, opts)
+        } else {
+            bp_print::print(p, doc, opts)
         }
     }
 
@@ -394,7 +440,7 @@ impl App {
     pub fn export_pdf(&mut self, doc: Doc, path: &Path) -> bool {
         let Some(d) = self.doc.as_ref() else { return false };
         let opts = self.print.options(&d.project, doc);
-        let r = bp_print::print(&d.project, doc, &opts)
+        let r = self.printed(&d.project, doc, &opts)
             .and_then(|p| p.pdf())
             .and_then(|pdf| bp_core::project::atomic_write(path, &pdf).map_err(|e| e.to_string()));
         match r {

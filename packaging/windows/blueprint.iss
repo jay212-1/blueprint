@@ -38,5 +38,11 @@ Source: "..\..\stage\*"; DestDir: "{app}"; Flags: ignoreversion recursesubdirs
 Name: "{autoprograms}\Blueprint"; Filename: "{app}\blueprint.exe"
 Name: "{autodesktop}\Blueprint"; Filename: "{app}\blueprint.exe"; Tasks: desktopicon
 
+[Registry]
+Root: HKA; Subkey: "Software\Classes\.blueprint"; ValueType: string; ValueData: "Blueprint.Project"; Flags: uninsdeletevalue
+Root: HKA; Subkey: "Software\Classes\Blueprint.Project"; ValueType: string; ValueData: "Blueprint project"; Flags: uninsdeletekey
+Root: HKA; Subkey: "Software\Classes\Blueprint.Project\DefaultIcon"; ValueType: string; ValueData: "{app}\blueprint.exe,0"
+Root: HKA; Subkey: "Software\Classes\Blueprint.Project\shell\open\command"; ValueType: string; ValueData: """{app}\blueprint.exe"" ""%1"""
+
 [Run]
 Filename: "{app}\blueprint.exe"; Description: "{cm:LaunchProgram,Blueprint}"; Flags: nowait postinstall

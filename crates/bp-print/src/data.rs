@@ -89,7 +89,7 @@ pub fn build(p: &Project, doc: Doc, opts: &Options) -> Data {
         Doc::MonitorList => monitor_list(p),
         Doc::PackList => pack(p),
         Doc::Labels => labels(p),
-        Doc::Setlist(_) | Doc::Plan(_) => Value::Null,
+        Doc::Setlist(_) | Doc::Plan(_) | Doc::Package => Value::Null,
     };
     if let (Some(o), Value::Object(b)) = (d.as_object_mut(), body) {
         o.extend(b);
@@ -912,4 +912,31 @@ fn plan(p: &Project, id: Id, opts: &Options) -> Value {
         PlanKind::Table(_) => d["sections"] = json!(plan_sections(p, id, Part::Rows, "", None)),
     }
     d
+}
+
+/// The cover of a production pack: the production and the contents.
+pub(crate) fn package(p: &Project, opts: &Options, entries: Vec<Value>, pages: usize) -> Data {
+    let rev = if p.mic.revision.number > 0 {
+        format!("Mic plan Rev {} · {}", p.mic.revision.number, p.mic.revision.date)
+    } else {
+        String::new()
+    };
+    Data(json!({
+        "title": "Production pack",
+        "subtitle": "",
+        "revision": format!("Printed {}", today()),
+        "paper": opts.paper_name(),
+        "landscape": false,
+        "theme": opts.theme_name(),
+        "legend": "",
+        "meta": {
+            "production": p.meta.production,
+            "company": p.meta.company,
+            "venue": p.meta.venue,
+            "dates": p.meta.dates,
+        },
+        "mic_revision": rev,
+        "entries": entries,
+        "pages": pages,
+    }))
 }

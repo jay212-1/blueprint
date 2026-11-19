@@ -4,6 +4,7 @@
 
 pub mod app;
 mod app_data;
+pub mod app_import;
 mod app_mic;
 mod app_patch;
 mod app_plans;

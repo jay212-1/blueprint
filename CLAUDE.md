@@ -53,10 +53,12 @@ Showtime Suite installs, updates and starts the others; its catalog is `showtime
   (`timing`) and their tables. `patch.rs` – devices, lines, inputs with splits, outputs, signal
   paths, checks, cable and stand list; `patch_grid.rs` its tables. `plans.rs` – the other plans
   (run of show, contacts, packing list, intercom, free tables), `stage.rs` – the stage plot and its
-  symbols as shapes, `plan_grid.rs` their tables.
+  symbols as shapes, `plan_grid.rs` their tables. `import.rs` – reading CSV / TSV / spreadsheets
+  into any table and CSV export; `exchange.rs` – the suite exchange file
+  (`docs/blueprint/exchange-format.md`).
 - `crates/bp-print` – Typst printing: `templates/*.typ` (layout and themes, kept apart from the
-  code; `setlist.typ` fits the type to one page, `plan.typ` the other plans and the stage plot), `fonts/` (OFL, embedded), `data.rs` (plans to JSON for the templates).
-- `crates/blueprint` – the egui app: `app.rs` (window, project actions), `app_*.rs` (pages; `app_stage.rs` the stage plot editor),
+  code; `setlist.typ` fits the type to one page, `plan.typ` the other plans and the stage plot, `package.typ` the cover of the production pack), `fonts/` (OFL, embedded), `data.rs` (plans to JSON for the templates).
+- `crates/blueprint` – the egui app: `app.rs` (window, project actions), `app_*.rs` (pages; `app_stage.rs` the stage plot editor, `app_import.rs` import / CSV export),
   `table.rs` (reusable spreadsheet editor that emits `Action`s), `theme.rs` (suite colours),
   `settings.rs` (`BLUEPRINT_CONFIG_DIR` redirects them; tests never touch the real settings).
 - `packaging/`, `release.sh`, `install-mac.sh`, `install.sh` – as in Lantern.

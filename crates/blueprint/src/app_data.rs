@@ -50,6 +50,50 @@ impl App {
                     ui.end_row();
                 }
             });
+        ui.add_space(24.0);
+        ui.label(RichText::new("FOR THE LIVE TOOLS").small().color(theme::MUTED));
+        ui.label(
+            RichText::new("Channel names, the patch, the mic plan per scene and the DCAs as one exchange file that Show Master and the other Showtime Suite tools can read.")
+                .color(theme::MUTED),
+        );
+        ui.add_space(4.0);
+        if ui.button("Export exchange file…").clicked() {
+            if let Some(path) = self.pick_exchange() {
+                self.export_exchange(&path);
+            }
+        }
+    }
+
+    fn pick_exchange(&self) -> Option<std::path::PathBuf> {
+        if !self.dialogs {
+            return None;
+        }
+        let name = self.doc.as_ref().map(|d| d.title()).unwrap_or_else(|| "Untitled".into());
+        let mut d = rfd::FileDialog::new()
+            .set_title("Export exchange file")
+            .add_filter("Showtime exchange", &["json"])
+            .set_file_name(format!("{name}.{}", bp_core::exchange::EXTENSION));
+        if let Some(dir) = &self.settings.last_dir {
+            d = d.set_directory(dir);
+        }
+        d.save_file()
+    }
+
+    /// Write the exchange file. True when written.
+    pub fn export_exchange(&mut self, path: &std::path::Path) -> bool {
+        let Some(doc) = self.doc.as_ref() else { return false };
+        let x = bp_core::exchange::export(&doc.project, &format!("Blueprint {}", env!("CARGO_PKG_VERSION")));
+        let r = bp_core::exchange::to_json(&x).and_then(|j| bp_core::project::atomic_write(path, j.as_bytes()).map_err(|e| e.to_string()));
+        match r {
+            Ok(()) => {
+                self.notify(format!("Exported {}", path.display()), false);
+                true
+            }
+            Err(e) => {
+                self.notify(format!("Could not export: {e}"), true);
+                false
+            }
+        }
     }
 
     pub(crate) fn sheet_page(&mut self, ui: &mut egui::Ui, sheet: Sheet) {
@@ -79,15 +123,18 @@ impl App {
         let len = grid.len(p);
         let state = self.tables.entry(key.clone()).or_default();
         let mut actions = Vec::new();
-        if let (Some(noun), true) = (add, grid.editable_rows()) {
-            let selected = state.selected.len();
-            ui.horizontal(|ui| {
+        let editable = grid.editable_rows();
+        let selected = state.selected.len();
+        let cursor = state.cursor.0;
+        let mut tool = None;
+        ui.horizontal(|ui| {
+            if let (Some(noun), true) = (add, editable) {
                 if ui
                     .button(format!("Add {noun}"))
                     .on_hover_text("Insert a row below the cursor (Cmd/Ctrl+Enter)")
                     .clicked()
                 {
-                    let at = if len == 0 { 0 } else { state.cursor.0 + 1 };
+                    let at = if len == 0 { 0 } else { cursor + 1 };
                     actions.push(Action::Insert { at });
                 }
                 if ui
@@ -99,9 +146,47 @@ impl App {
                         rows: state.selected.iter().copied().collect(),
                     });
                 }
+            }
+            ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
+                if ui
+                    .add_enabled(len > 0, egui::Button::new("Export CSV…"))
+                    .on_hover_text("The table as a CSV file for Excel, Numbers or another program")
+                    .clicked()
+                {
+                    tool = Some(false);
+                }
+                if editable
+                    && ui
+                        .button("Import…")
+                        .on_hover_text("Add rows from a CSV, TSV, text or spreadsheet file (XLSX, XLS, ODS); you choose which column goes where")
+                        .clicked()
+                {
+                    tool = Some(true);
+                }
             });
-            ui.add_space(4.0);
+        });
+        ui.add_space(4.0);
+        match tool {
+            Some(true) => {
+                if let Some(path) = self.pick_import() {
+                    self.start_import(grid, &path);
+                }
+                return;
+            }
+            Some(false) => {
+                if let Some(path) = self.pick_csv(grid) {
+                    self.export_csv(grid, &path);
+                }
+                return;
+            }
+            None => {}
         }
+        if self.import.as_ref().is_some_and(|i| i.key == key) {
+            self.import_panel(ui, grid);
+        }
+        let Some(doc) = self.doc.as_ref() else { return };
+        let p = &doc.project;
+        let state = self.tables.entry(key.clone()).or_default();
         let columns = grid.columns(p);
         let people: Vec<String> = p.cast.iter().map(|x| x.name.clone()).collect();
         let text = |r: usize, c: usize| grid.text(p, r, c);
