@@ -297,3 +297,76 @@ fn print_preview_and_pdf() {
     assert!(h.state_mut().export_pdf(bp_print::Doc::MicPlot, &pdf));
     assert!(std::fs::read(&pdf).unwrap().starts_with(b"%PDF"));
 }
+
+#[test]
+fn band_show_setlists() {
+    let mut h = harness();
+    h.get_by_label_contains("demo band show").click();
+    settle(&mut h);
+    let club = project(&h).setlists[0].id;
+    assert_eq!(h.state().page, Page::Setlist(club));
+    h.get_by_label_contains("16 songs").hover();
+    shot(&mut h, "setlist-club");
+
+    // A new title typed into the setlist lands in the library.
+    let songs = project(&h).songs.len();
+    {
+        let st = h.state_mut().tables.entry(format!("setlist:{club}")).or_default();
+        st.select(&[2]);
+        st.cursor = (2, bp_core::setlist::setcol::TITLE);
+    }
+    settle(&mut h);
+    type_text(&mut h, "Brand New Song");
+    key(&mut h, Key::Enter, Modifiers::NONE);
+    let p = project(&h);
+    assert_eq!(p.songs.len(), songs + 1, "a new song (the old one is used twice)");
+    assert!(p.song_named("Brand New Song").is_some());
+    key(&mut h, Key::Z, Modifiers::COMMAND);
+    assert_eq!(project(&h).songs.len(), songs);
+
+    // The library shows where songs are used.
+    h.get_by_label_contains("Song library").click();
+    settle(&mut h);
+    assert_eq!(h.state().page, Page::Songs);
+    shot(&mut h, "song-library");
+
+    // A new setlist, a logo, then the print preview.
+    h.get_by_label("+ New setlist").click();
+    settle(&mut h);
+    let p = project(&h);
+    assert_eq!(p.setlists.len(), 3);
+    let new = p.setlists[2].id;
+    assert_eq!(h.state().page, Page::Setlist(new));
+    assert_eq!(p.setlists[2].band, "Northbound Static");
+    let dir = tempfile::tempdir().unwrap();
+    let logo = dir.path().join("logo.svg");
+    std::fs::write(&logo, br##"<svg xmlns="http://www.w3.org/2000/svg" width="10" height="10"><rect width="10" height="10" fill="#333"/></svg>"##).unwrap();
+    assert!(h.state_mut().set_logo(club, &logo));
+    let bad = dir.path().join("logo.txt");
+    std::fs::write(&bad, "hello").unwrap();
+    assert!(!h.state_mut().set_logo(club, &bad));
+
+    h.state_mut().page = Page::Setlist(club);
+    settle(&mut h);
+    h.get_by_label("Print…").click();
+    settle(&mut h);
+    assert_eq!(h.state().page, Page::Print);
+    assert_eq!(h.state().print.doc, bp_print::Doc::Setlist(club));
+    h.get_by_label_contains("type fitted at").hover();
+    shot(&mut h, "print-setlist");
+    h.get_by_label("Technical / FOH").click();
+    settle(&mut h);
+    let pdf = dir.path().join("set.pdf");
+    assert!(h.state_mut().export_pdf(bp_print::Doc::Setlist(club), &pdf));
+    assert!(std::fs::read(&pdf).unwrap().starts_with(b"%PDF"));
+
+    // Deleting a setlist, and undoing it.
+    h.state_mut().page = Page::Setlist(new);
+    settle(&mut h);
+    h.get_by_label("Delete setlist").click();
+    settle(&mut h);
+    assert_eq!(project(&h).setlists.len(), 2);
+    assert_eq!(h.state().page, Page::Songs);
+    key(&mut h, Key::Z, Modifiers::COMMAND);
+    assert_eq!(project(&h).setlists.len(), 3);
+}

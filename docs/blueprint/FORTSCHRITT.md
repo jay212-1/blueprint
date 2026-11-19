@@ -43,7 +43,33 @@ eintragen (auch per Copy/Paste aus Excel/Numbers), speichern, Programm hart been
 Gesamt-PDF (M6), Akkuplan pro Vorstellung mit Zeiten (nur Regeln: vor der Show, Pause, nach
 Szene).
 
-## Als Nächstes: M3 – Setlisten
+## M3 – Setlisten (in 0.1.0, 2026-11-19) ✅
 
-Songbibliothek, mehrere Setlisten, Spezialeinträge, Dauern und Uhrzeiten, Themes „Bühne“,
-„Technik/FOH“, „Elegant“, automatische Schriftgröße mit Mindestgröße und Warnung.
+- Songbibliothek: Titel, Tonart, BPM, Länge, Lead-Vocal, Besetzung, Licht- und Ton-Cue, Farbe,
+  Notizen; „Used“ zeigt, wie oft ein Song in Setlisten steht.
+- Beliebig viele Setlisten (Navigation › SETLISTS, „+ New setlist“), die auf die Bibliothek
+  verweisen: Änderungen an einem Song gelten überall. Neue Titel in einer Setliste landen in der
+  Bibliothek. Duplizieren (z. B. Festival-Kurzset), Löschen mit Undo.
+- Spezialeinträge: Break, Announcement, Changeover, Encore; Übergänge Gap / Attacca / Segue.
+- Startzeit und Lücke pro Setliste: Startzeit und Uhrzeit jedes Eintrags, Set-Längen, Musikzeit,
+  Gesamtdauer, Ende; Warnung bei Songs ohne Länge.
+- Logo pro Setliste (PNG, JPEG, SVG).
+- Druck auf einer Seite mit automatischer Schriftgröße (Warnung, wenn es auch bei der kleinsten
+  nicht passt): Stage (große Titel, Tonart, Übergangszeichen), Technical / FOH (alle Spalten mit
+  Zeiten und Cues, leere Spalten fallen weg), Elegant (Serif, zentriert, für Gäste).
+- Demo-Band „Northbound Static“ (Startseite): 16 Songs, Club-Show in zwei Sets mit Zugabe und
+  ein 45-Minuten-Festivalset.
+- Tests: 35 Kern-Tests, 5 Druck-Tests, 11 UI-Tests.
+
+**Zum Testen:** Startseite › „Try the demo band show“. Club show ansehen, „Details“ aufklappen und
+Startzeit/Lücke ändern, in die Titelspalte einen neuen Song tippen (erscheint in der Song library),
+Übergang auf Attacca setzen, „Print…“ › Themes durchklicken, Logo wählen, PDF exportieren. Eine
+Setliste duplizieren und kürzen; im Druck wird die Schrift größer.
+
+**Offen / bewusst später:** Import von Songlisten aus CSV/XLSX mit Spaltenzuordnung (M6),
+Verknüpfung von Songs mit Patch/Inputs (M4).
+
+## Als Nächstes: M4 – Patch
+
+Locations, Geräte mit Ports, Verbindungen (Multicore, Dante, AES50, MADI …), Input- und
+Output-Patch mit Splits und vollem Signalweg, Prüfungen, Kabel- und Stativliste, Etiketten.

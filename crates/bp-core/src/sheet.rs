@@ -70,7 +70,7 @@ fn insert_row<T: Row>(v: &mut Vec<T>, at: usize, id: Id) -> usize {
     at
 }
 
-fn remove_rows<T: Row>(v: &mut Vec<T>, rows: &[usize]) {
+pub(crate) fn remove_rows<T>(v: &mut Vec<T>, rows: &[usize]) {
     let mut i = 0;
     v.retain(|_| {
         let keep = !rows.contains(&i);
@@ -81,7 +81,7 @@ fn remove_rows<T: Row>(v: &mut Vec<T>, rows: &[usize]) {
 
 /// Move `rows` (as a block, order kept) so that they stand before the row
 /// that was at `to`. Returns their new indices.
-fn move_rows<T: Row>(v: &mut Vec<T>, rows: &[usize], to: usize) -> Vec<usize> {
+pub(crate) fn move_rows<T>(v: &mut Vec<T>, rows: &[usize], to: usize) -> Vec<usize> {
     let mut sorted: Vec<usize> = rows.iter().copied().filter(|r| *r < v.len()).collect();
     sorted.sort_unstable();
     sorted.dedup();
@@ -106,7 +106,7 @@ fn color_text(c: &str) -> String {
     c.to_string()
 }
 
-fn parse_color(v: &str) -> Result<String, String> {
+pub(crate) fn parse_color(v: &str) -> Result<String, String> {
     let v = v.trim().to_ascii_lowercase();
     let v = if v == "none" { String::new() } else { v };
     if COLORS.contains(&v.as_str()) {

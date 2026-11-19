@@ -4,7 +4,7 @@ Planning for live shows, part of the Showtime Suite: mic plots for theatre and m
 patch plans across several locations and more – everything printable as a clean PDF. Written in Rust
 (egui), for macOS, Windows and Linux.
 
-**Status: 0.1, in progress.** Projects, master data, the mic plan and its prints work; setlists, patch
+**Status: 0.1, in progress.** Projects, master data, the mic plan, setlists and their prints work; patch
 plans and the other plans follow (see `docs/blueprint/UMSETZUNGSPLAN.md`).
 
 - **One project file** (`.blueprint`) per production: production data, cast, roles with their
@@ -16,9 +16,12 @@ plans and the other plans follow (see `docs/blueprint/UMSETZUNGSPLAN.md`).
 - **Mic plan:** scene × transmitter matrix, usual transmitter per role with exceptions per scene,
   A/B miking, swaps with the time there is, casts of the day, spares swapped in with one click, DCA
   programming per scene, battery plan, frequencies, and checks for every clash.
+- **Setlists:** a song library and any number of setlists that use it, breaks, announcements,
+  changeovers and encores, attacca and segue, times of day from the start time, set lengths, a
+  logo. Printed on one page with the type as large as fits, for the stage, for FOH or elegant.
 - **Prints:** mic plot, mic cards, swap list, frequency list, DCA sheet and battery plan as PDF
   (Typst with embedded fonts), A4 / A3 / Letter, themes for the stage, the tech desk or to save
-  ink, revisions with change marks. Try the demo musical from the start page.
+  ink, revisions with change marks. Try the demo musical or the demo band show from the start page.
 - **Safe:** undo / redo, atomic saving with backups, autosave every 20 seconds and recovery after a
   crash.
 

@@ -19,3 +19,10 @@
 - 2026-11-19: Revisionen: „Rev N ausgeben“ speichert den Stand; markiert werden Änderungen gegen die Revision davor (wie in Theater-Paperwork üblich).
 - 2026-11-19: serde_json mit `float_roundtrip`, sonst ändern sich Frequenzen beim Laden in der letzten Stelle.
 - 2026-11-19: Demo-Musical „The Lighthouse Keeper“ ist frei erfunden (keine echten Stücke oder Figuren).
+- 2026-11-19: Setlisten verweisen auf Songs der Songbibliothek (Single Source of Truth); Song-Felder in der Setlisten-Tabelle ändern den Bibliothekssong. Ein neuer Titel legt einen Song an; ein nur hier benutzter Song wird beim Umtippen umbenannt, ein mehrfach benutzter nicht (dann neuer Song).
+- 2026-11-19: Wird ein Song aus der Bibliothek gelöscht, verschwinden seine Einträge aus den Setlisten (Undo holt beides zurück).
+- 2026-11-19: Die Lücke zwischen Songs gilt nur zwischen zwei Songs mit Übergang „Gap“; Attacca und Segue haben keine Lücke. Pausen teilen die Sets, „Encore“ beginnt einen eigenen Teil.
+- 2026-11-19: Setlisten-Auto-Schriftgröße in der Typst-Vorlage (`measure` + Halbierungssuche zwischen Max und Min des Themes); passt es auch bei Min nicht, warnt Rust anhand der Seitenzahl. Die gewählte Größe kommt über `<fit-size>`-Metadaten zurück.
+- 2026-11-19: Themes werden pro Dokument angeboten: Setlisten Stage / Technical (FOH) / Elegant, Mic-Pläne Stage / Technical / Save ink.
+- 2026-11-19: Setlisten-Logo als Base64 in der Projektdatei (max. 2 MB, PNG/JPEG/GIF/SVG geprüft), damit das Projekt eine Datei bleibt.
+- 2026-11-19: Demo-Band „Northbound Static“ und ihre Songs sind frei erfunden.

@@ -26,6 +26,8 @@ pub enum Page {
     Mic(MicSheet),
     Checks,
     Print,
+    Songs,
+    Setlist(Id),
 }
 
 /// What to do once unsaved changes are dealt with.
@@ -33,6 +35,7 @@ pub enum Page {
 enum After {
     New,
     Demo,
+    DemoBand,
     Open(Option<PathBuf>),
     Close,
     Quit,
@@ -107,6 +110,11 @@ impl App {
         self.request(After::Demo);
     }
 
+    /// The demo band show (song library and two setlists), as an untitled project.
+    pub fn open_demo_band(&mut self) {
+        self.request(After::DemoBand);
+    }
+
     /// Open a project file (asks first when there are unsaved changes).
     pub fn open(&mut self, path: Option<PathBuf>) {
         self.request(After::Open(path));
@@ -133,6 +141,12 @@ impl App {
             After::Demo => {
                 self.set_doc(Document::new(bp_core::demo::musical()));
                 self.page = Page::Mic(MicSheet::Plot);
+            }
+            After::DemoBand => {
+                let p = bp_core::demo::band();
+                let first = p.setlists.first().map(|s| s.id);
+                self.set_doc(Document::new(p));
+                self.page = first.map_or(Page::Songs, Page::Setlist);
             }
             After::Open(Some(path)) => self.open_path(&path),
             After::Open(None) => {
@@ -395,6 +409,8 @@ impl App {
                     Page::Mic(s) => self.mic_page(ui, s),
                     Page::Checks => self.checks_page(ui),
                     Page::Print => self.print_page(ui),
+                    Page::Songs => self.songs_page(ui),
+                    Page::Setlist(id) => self.setlist_page(ui, id),
                 });
         }
         self.modals(&ctx);
@@ -487,8 +503,38 @@ impl App {
         {
             self.page = Page::Print;
         }
+        section(ui, "SETLISTS");
+        let lists: Vec<(Id, String)> = self
+            .doc
+            .as_ref()
+            .map(|d| {
+                d.project
+                    .setlists
+                    .iter()
+                    .map(|s| (s.id, if s.name.trim().is_empty() { "Untitled setlist".into() } else { s.name.clone() }))
+                    .collect()
+            })
+            .unwrap_or_default();
+        let songs = self.doc.as_ref().map_or(0, |d| d.project.songs.len());
+        let mut item = |ui: &mut egui::Ui, page: Page, label: String| {
+            let on = self.page == page;
+            let w = ui.available_width();
+            if ui.add(egui::Button::selectable(on, label).min_size(egui::vec2(w, 26.0))).clicked() {
+                self.page = page;
+            }
+        };
+        item(ui, Page::Songs, format!("Song library  ({songs})"));
+        for (id, name) in lists {
+            item(ui, Page::Setlist(id), name);
+        }
+        if ui
+            .add(egui::Button::new(RichText::new("+ New setlist").color(theme::MUTED)).frame(false))
+            .clicked()
+        {
+            self.new_setlist();
+        }
         section(ui, "MORE PLANS");
-        for p in ["Setlists", "Patch", "Stage plot", "Run of show", "More plans"] {
+        for p in ["Patch", "Stage plot", "Run of show", "More plans"] {
             ui.add_enabled(false, egui::Button::selectable(false, p).min_size(egui::vec2(ui.available_width(), 26.0)))
                 .on_disabled_hover_text("Coming in a later version");
         }

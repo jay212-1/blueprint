@@ -231,6 +231,159 @@ pub fn musical() -> Project {
     p
 }
 
+/// A band show ("Northbound Static", made up): five musicians, a song library
+/// of 16 songs and two setlists that share them (a club show in two sets with
+/// an encore, and a short festival set).
+pub fn band() -> Project {
+    use crate::setlist::{Entry, EntryKind, Setlist, Song, Transition};
+    let mut p = Project {
+        meta: Meta {
+            production: "Northbound Static".into(),
+            company: "Northbound Static".into(),
+            venue: "Kulturhalle".into(),
+            dates: "Tour 2027".into(),
+            notes: "Demo project".into(),
+        },
+        ..Project::default()
+    };
+    for (name, short, notes) in [
+        ("Ida Lorenz", "IL", "Lead vocal, acoustic guitar"),
+        ("Malte Roth", "MR", "Electric guitar, backing vocal"),
+        ("Yusuf Demir", "YD", "Bass"),
+        ("Carla Vogt", "CV", "Keys, synth, backing vocal"),
+        ("Henrik Jansen", "HJ", "Drums, click and playback"),
+    ] {
+        let id = p.alloc_id();
+        p.cast.push(Person { id, name: name.into(), short: short.into(), notes: notes.into(), ..Person::default() });
+    }
+    // Title, key, bpm, length (s), lead, line-up, light, sound, colour, notes.
+    type SongRow<'a> = (&'a str, &'a str, f64, f64, &'a str, &'a str, &'a str, &'a str, &'a str, &'a str);
+    let songs: [SongRow; 16] = [
+        ("Paper Satellites", "E", 128.0, 222.0, "Ida", "Full band", "LX 10", "Snap 1", "", "Count-in from playback"),
+        ("Low Tide Radio", "A", 96.0, 248.0, "Ida", "Full band", "LX 12", "Snap 2", "", ""),
+        ("Glass Harbour", "F#m", 110.0, 265.0, "Ida", "Full band, Carla on synth bass", "LX 14", "Snap 3", "blue", ""),
+        ("Northbound", "D", 140.0, 201.0, "Malte", "Full band", "LX 16", "Snap 4", "", "Malte sings lead"),
+        ("Small Hours", "C", 72.0, 284.0, "Ida", "Ida and Carla only", "LX 20", "Snap 5", "purple", "Acoustic: band leaves the stage"),
+        ("Copper Lines", "G", 118.0, 236.0, "Ida", "Full band", "LX 22", "Snap 6", "", ""),
+        ("Weather Report", "Bb", 124.0, 213.0, "Ida", "Full band", "LX 24", "Snap 7", "", ""),
+        ("Static Bloom", "E", 132.0, 257.0, "Ida", "Full band, playback", "LX 26", "Snap 8", "orange", "Click on, strings from playback"),
+        ("The Long Way North", "Am", 88.0, 312.0, "Ida", "Full band", "LX 30", "Snap 9", "", ""),
+        ("Headlights", "B", 150.0, 189.0, "Ida", "Full band", "LX 32", "Snap 10", "", ""),
+        ("Ferris Wheel", "Eb", 104.0, 242.0, "Carla", "Full band", "LX 34", "Snap 11", "", "Carla sings lead"),
+        ("Signal Fires", "D", 126.0, 230.0, "Ida", "Full band", "LX 36", "Snap 12", "", ""),
+        ("Undertow", "C#m", 98.0, 274.0, "Ida", "Full band", "LX 38", "Snap 13", "", ""),
+        ("Postcards", "F", 116.0, 205.0, "Ida", "Full band", "LX 40", "Snap 14", "", ""),
+        ("Lighthouse Code", "A", 136.0, 228.0, "Ida", "Full band, playback", "LX 44", "Snap 15", "red", "Confetti at the last chorus"),
+        ("Goodnight, City", "G", 80.0, 296.0, "Ida", "Full band", "LX 50", "Snap 16", "", "Last song: house lights after"),
+    ];
+    let mut sid = Vec::new();
+    for (title, key, bpm, len, lead, lineup, light, sound, color, notes) in songs {
+        let id = p.alloc_id();
+        p.songs.push(Song {
+            id,
+            title: title.into(),
+            key: key.into(),
+            bpm: Some(bpm),
+            duration: Some(len),
+            lead: lead.into(),
+            lineup: lineup.into(),
+            light_cue: light.into(),
+            sound_cue: sound.into(),
+            color: color.into(),
+            notes: notes.into(),
+        });
+        sid.push(id);
+    }
+    enum E<'a> {
+        S(usize, Transition),
+        X(EntryKind, &'a str, f64, &'a str),
+    }
+    use Transition::{Attacca, Gap, Segue};
+    let list = |p: &mut Project, name: &str, venue: &str, date: &str, start: f64, gap: f64, items: &[E]| {
+        let id = p.alloc_id();
+        let mut entries = Vec::new();
+        for it in items {
+            let eid = p.alloc_id();
+            entries.push(match it {
+                E::S(i, t) => Entry { id: eid, kind: EntryKind::Song, song: Some(sid[*i]), transition: *t, ..Entry::default() },
+                E::X(k, title, len, notes) => Entry {
+                    id: eid,
+                    kind: *k,
+                    title: (*title).into(),
+                    duration: (*len > 0.0).then_some(*len),
+                    notes: (*notes).into(),
+                    ..Entry::default()
+                },
+            });
+        }
+        p.setlists.push(Setlist {
+            id,
+            name: name.into(),
+            band: "Northbound Static".into(),
+            venue: venue.into(),
+            date: date.into(),
+            start: Some(start),
+            gap,
+            entries,
+            ..Setlist::default()
+        });
+    };
+    list(
+        &mut p,
+        "Club show",
+        "Kulturhalle",
+        "Fri 16 April 2027",
+        20.5 * 3600.0,
+        25.0,
+        &[
+            E::X(EntryKind::Announcement, "Intro from playback", 60.0, "House lights out on the first note"),
+            E::S(0, Attacca),
+            E::S(1, Gap),
+            E::S(2, Gap),
+            E::X(EntryKind::Announcement, "Hello, introduce the band", 90.0, ""),
+            E::S(3, Gap),
+            E::S(5, Segue),
+            E::S(6, Gap),
+            E::X(EntryKind::Changeover, "Acoustic set-up", 120.0, "Two stools, acoustic guitar DI"),
+            E::S(4, Gap),
+            E::S(8, Gap),
+            E::X(EntryKind::Break, "Interval", 1200.0, ""),
+            E::S(7, Attacca),
+            E::S(9, Gap),
+            E::S(10, Gap),
+            E::S(11, Gap),
+            E::S(12, Segue),
+            E::S(13, Gap),
+            E::X(EntryKind::Encore, "Encore", 120.0, "Off and back on"),
+            E::S(14, Gap),
+            E::S(15, Gap),
+        ],
+    );
+    list(
+        &mut p,
+        "Festival set",
+        "Open-air, second stage",
+        "Sat 10 July 2027",
+        17.25 * 3600.0,
+        15.0,
+        &[
+            E::S(0, Attacca),
+            E::S(3, Gap),
+            E::S(1, Gap),
+            E::S(7, Gap),
+            E::X(EntryKind::Announcement, "Hello festival", 45.0, ""),
+            E::S(9, Gap),
+            E::S(5, Gap),
+            E::S(13, Gap),
+            E::S(11, Attacca),
+            E::S(12, Gap),
+            E::S(14, Gap),
+            E::S(15, Gap),
+        ],
+    );
+    p
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -258,6 +411,25 @@ mod tests {
         assert_eq!(v.problems.len(), 1, "{msgs:#?}");
         assert!(matches!(v.problems[0], Problem::SwapTooShort { .. }));
         // The file survives saving and loading.
+        let text = crate::project::to_string(&p).unwrap();
+        assert_eq!(crate::project::parse(&text).unwrap(), p);
+    }
+
+    #[test]
+    fn the_band_show_has_two_setlists_from_one_library() {
+        use crate::setlist::timing;
+        let p = band();
+        assert_eq!(p.songs.len(), 16);
+        assert_eq!(p.setlists.len(), 2);
+        let club = timing(&p, &p.setlists[0]);
+        assert_eq!(club.songs, 16);
+        assert_eq!(club.parts.iter().map(|x| x.name.as_str()).collect::<Vec<_>>(), ["Set 1", "Set 2", "Encore"]);
+        assert_eq!(club.unknown, 0);
+        let fest = timing(&p, &p.setlists[1]);
+        // A festival slot of about 45 minutes.
+        assert!((2400.0..2900.0).contains(&fest.total), "{}", fest.total);
+        // Shared songs: one library entry used in both.
+        assert_eq!(p.song_uses(p.songs[0].id), 2);
         let text = crate::project::to_string(&p).unwrap();
         assert_eq!(crate::project::parse(&text).unwrap(), p);
     }

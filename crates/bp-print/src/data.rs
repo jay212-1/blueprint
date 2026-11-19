@@ -42,6 +42,9 @@ fn plot_columns(opts: &Options) -> usize {
 }
 
 pub fn build(p: &Project, doc: Doc, opts: &Options) -> Data {
+    if let Doc::Setlist(id) = doc {
+        return Data(setlist(p, id, opts));
+    }
     let view = MicView::build(p);
     let plan = &p.mic;
     let rev = if plan.revision.number > 0 {
@@ -75,6 +78,7 @@ pub fn build(p: &Project, doc: Doc, opts: &Options) -> Data {
         Doc::Frequencies => frequencies(p, &view),
         Doc::DcaSheet => dca_sheet(p),
         Doc::BatteryPlan => battery(p, &view),
+        Doc::Setlist(_) => Value::Null,
     };
     if let (Some(o), Value::Object(b)) = (d.as_object_mut(), body) {
         o.extend(b);
@@ -402,4 +406,100 @@ fn battery(p: &Project, view: &MicView) -> Value {
         "widths": [0, 1.5, 1, 0, 0, 0, 3],
         "sections": [section("", rows)],
     })
+}
+
+fn setlist(p: &Project, id: Id, opts: &Options) -> Value {
+    use bp_core::setlist::{entry_length, entry_title, timing, EntryKind, Setlist};
+    use bp_core::time::format_clock;
+    let empty = Setlist::default();
+    let s = p.setlist(id).unwrap_or(&empty);
+    let t = timing(p, s);
+    let pick = |a: &str, b: &str| if a.trim().is_empty() { b.to_string() } else { a.to_string() };
+    let entries: Vec<Value> = s
+        .entries
+        .iter()
+        .zip(&t.entries)
+        .enumerate()
+        .map(|(i, (e, et))| {
+            let song = e.song.and_then(|id| p.song(id)).filter(|_| e.kind == EntryKind::Song);
+            let f = |g: fn(&bp_core::setlist::Song) -> String| song.map(g).unwrap_or_default();
+            // The sign goes on an entry only when a song follows.
+            let next_song = s.entries.get(i + 1).is_some_and(|x| x.kind == EntryKind::Song);
+            json!({
+                "kind": format!("{:?}", e.kind).to_ascii_lowercase(),
+                "kind_label": e.kind.label(),
+                "no": et.number.map(|n| n.to_string()).unwrap_or_default(),
+                "title": entry_title(p, e),
+                "key": f(|x| x.key.clone()),
+                "bpm": song.and_then(|x| x.bpm).map(format_number).unwrap_or_default(),
+                "length": entry_length(p, e).map(format_duration).unwrap_or_default(),
+                "at": format_duration(et.at),
+                "clock": et.clock.map(format_clock).unwrap_or_default(),
+                "lead": f(|x| x.lead.clone()),
+                "lineup": f(|x| x.lineup.clone()),
+                "light": f(|x| x.light_cue.clone()),
+                "sound": f(|x| x.sound_cue.clone()),
+                "notes": if e.notes.trim().is_empty() { f(|x| x.notes.clone()) } else { e.notes.clone() },
+                "color": f(|x| x.color.clone()),
+                "next": if next_song { e.transition.sign() } else { "" },
+                "next_label": if next_song { e.transition.label() } else { "" },
+                "minutes": entry_length(p, e).filter(|l| *l > 0.0).map(minutes).unwrap_or_default(),
+            })
+        })
+        .collect();
+    // FOH columns: the fixed ones and those with something in them.
+    let has = |k: &str| entries.iter().any(|e| e[k].as_str().is_some_and(|v| !v.is_empty()) && e["kind"] == "song");
+    // `wide`: share of the free width (0 = as wide as the text).
+    let mut columns = vec![json!({"key": "no", "title": "#", "wide": 0, "mono": true})];
+    if s.start.is_some() {
+        columns.push(json!({"key": "clock", "title": "Clock", "wide": 0, "mono": true}));
+    }
+    columns.push(json!({"key": "at", "title": "Starts", "wide": 0, "mono": true}));
+    columns.push(json!({"key": "title", "title": "Title", "wide": 2.2, "mono": false}));
+    for (k, title, wide, mono) in [
+        ("key", "Key", 0.0, false),
+        ("bpm", "BPM", 0.0, true),
+        ("length", "Length", 0.0, true),
+        ("lead", "Lead", 0.0, false),
+        ("lineup", "Line-up", 1.3, false),
+        ("light", "Light", 0.0, false),
+        ("sound", "Sound", 0.0, false),
+        ("notes", "Notes", 1.6, false),
+    ] {
+        if k == "length" || has(k) {
+            columns.push(json!({"key": k, "title": title, "wide": wide, "mono": mono}));
+        }
+    }
+    let parts: Vec<Value> = t
+        .parts
+        .iter()
+        .map(|x| json!({"name": x.name, "length": format_duration(x.length), "songs": x.songs}))
+        .collect();
+    json!({
+        "title": pick(&s.name, "Setlist"),
+        "band": pick(&s.band, &p.meta.production),
+        "venue": pick(&s.venue, &p.meta.venue),
+        "date": s.date,
+        "start": s.start.map(format_clock).unwrap_or_default(),
+        "paper": opts.paper_name(),
+        "landscape": opts.landscape,
+        "theme": opts.theme_name(),
+        "summary": t.summary(),
+        "printed": format!("Printed {}", today()),
+        "entries": entries,
+        "columns": columns,
+        "parts": parts,
+    })
+}
+
+/// "20 min", "1 h 05 min", "45 s".
+fn minutes(secs: f64) -> String {
+    let m = (secs / 60.0).round() as u64;
+    if secs < 60.0 {
+        format!("{} s", secs.round() as u64)
+    } else if m >= 60 {
+        format!("{} h {:02} min", m / 60, m % 60)
+    } else {
+        format!("{m} min")
+    }
 }

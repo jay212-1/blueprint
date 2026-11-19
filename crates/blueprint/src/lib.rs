@@ -6,6 +6,7 @@ pub mod app;
 mod app_data;
 mod app_mic;
 mod app_print;
+mod app_setlist;
 mod app_start;
 pub mod settings;
 pub mod table;

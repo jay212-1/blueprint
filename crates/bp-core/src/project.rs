@@ -73,6 +73,9 @@ fn repair_ids(p: &mut Project) {
         .chain(p.capsules.iter().map(|x| x.id))
         .chain(p.locations.iter().map(|x| x.id))
         .chain(p.mic.variants.iter().map(|x| x.id))
+        .chain(p.songs.iter().map(|x| x.id))
+        .chain(p.setlists.iter().map(|x| x.id))
+        .chain(p.setlists.iter().flat_map(|s| s.entries.iter().map(|x| x.id)))
         .max()
         .unwrap_or(0);
     p.next_id = p.next_id.max(max + 1);

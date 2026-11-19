@@ -50,6 +50,35 @@ pub fn format_number(v: f64) -> String {
     s.trim_end_matches('0').trim_end_matches('.').to_string()
 }
 
+/// A time of day: "20:00", "8:30", "20.15", "2015", "20:00:30". Seconds
+/// after midnight.
+pub fn parse_clock(text: &str) -> Option<f64> {
+    let t = text.trim().replace('.', ":");
+    let parts: Vec<&str> = if t.contains(':') {
+        t.split(':').collect()
+    } else if t.len() == 4 && t.chars().all(|c| c.is_ascii_digit()) {
+        vec![&t[..2], &t[2..]]
+    } else {
+        vec![t.as_str()]
+    };
+    if parts.is_empty() || parts.len() > 3 {
+        return None;
+    }
+    let mut v = Vec::new();
+    for p in &parts {
+        v.push(p.trim().parse::<u32>().ok()?);
+    }
+    let (h, m, s) = (v[0], v.get(1).copied().unwrap_or(0), v.get(2).copied().unwrap_or(0));
+    (h < 24 && m < 60 && s < 60).then_some(f64::from(h * 3600 + m * 60 + s))
+}
+
+/// "20:05" (past midnight it goes on with "00:10"); seconds are rounded.
+pub fn format_clock(secs: f64) -> String {
+    let total = (secs.max(0.0).round() as u64 + 30) / 60;
+    let (h, m) = ((total / 60) % 24, total % 60);
+    format!("{h:02}:{m:02}")
+}
+
 /// Today's date as "2026-11-19" (UTC).
 pub fn today() -> String {
     let secs = std::time::SystemTime::now()
@@ -82,6 +111,20 @@ mod tests {
         assert_eq!(date_of_day(0), "1970-01-01");
         assert_eq!(date_of_day(20_776), "2026-11-19");
         assert_eq!(date_of_day(11_016), "2000-02-29");
+    }
+
+    #[test]
+    fn clocks() {
+        assert_eq!(parse_clock("20:00"), Some(72_000.0));
+        assert_eq!(parse_clock("8.30"), Some(30_600.0));
+        assert_eq!(parse_clock("2015"), Some(72_900.0));
+        assert_eq!(parse_clock("21"), Some(75_600.0));
+        assert_eq!(parse_clock("24:00"), None);
+        assert_eq!(parse_clock("x"), None);
+        assert_eq!(format_clock(72_000.0), "20:00");
+        assert_eq!(format_clock(86_400.0 + 600.0), "00:10");
+        assert_eq!(format_clock(72_029.0), "20:00");
+        assert_eq!(format_clock(72_031.0), "20:01");
     }
 
     #[test]

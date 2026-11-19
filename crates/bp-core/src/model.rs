@@ -3,6 +3,7 @@
 //! renamed role is renamed everywhere.
 
 use crate::mic::MicPlan;
+use crate::setlist::{Setlist, Song};
 use serde::{Deserialize, Serialize};
 
 /// Current project file schema. Raise it with every incompatible change and
@@ -28,6 +29,8 @@ pub struct Project {
     pub capsules: Vec<Capsule>,
     pub locations: Vec<Location>,
     pub mic: MicPlan,
+    pub songs: Vec<Song>,
+    pub setlists: Vec<Setlist>,
 }
 
 impl Default for Project {
@@ -43,6 +46,8 @@ impl Default for Project {
             capsules: Vec::new(),
             locations: Vec::new(),
             mic: MicPlan::default(),
+            songs: Vec::new(),
+            setlists: Vec::new(),
         }
     }
 }
@@ -100,6 +105,8 @@ impl Project {
             s.roles.retain(|r| roles.contains(r));
         }
         self.mic.prune(&people, &roles, &scenes, &txs, &capsules);
+        let songs: Vec<Id> = self.songs.iter().map(|s| s.id).collect();
+        crate::setlist::prune(&mut self.setlists, &songs);
     }
 }
 

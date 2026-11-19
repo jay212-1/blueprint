@@ -49,9 +49,10 @@ Showtime Suite installs, updates and starts the others; its catalog is `showtime
 - `crates/bp-core/src/mic.rs` – the mic plan (usual transmitter per role, exceptions per scene,
   casts of the day, swaps, DCAs, batteries) and `MicView`, which works out the matrix, swaps and
   problems; `mic_grid.rs` shows it as tables; `grid.rs` is the table interface all lists share;
-  `demo.rs` the demo musical.
+  `demo.rs` the demo musical and the demo band show. `setlist.rs` – song library, setlists, times
+  (`timing`) and their tables.
 - `crates/bp-print` – Typst printing: `templates/*.typ` (layout and themes, kept apart from the
-  code), `fonts/` (OFL, embedded), `data.rs` (plans to JSON for the templates).
+  code; `setlist.typ` fits the type to one page), `fonts/` (OFL, embedded), `data.rs` (plans to JSON for the templates).
 - `crates/blueprint` – the egui app: `app.rs` (window, project actions), `app_*.rs` (pages),
   `table.rs` (reusable spreadsheet editor that emits `Action`s), `theme.rs` (suite colours),
   `settings.rs` (`BLUEPRINT_CONFIG_DIR` redirects them; tests never touch the real settings).

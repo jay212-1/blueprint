@@ -35,3 +35,13 @@
 - Demo project "The Lighthouse Keeper" (start page): 12 performers, 15 scenes, 16 transmitters with
   2 spares, swaps, A/B miking, two casts of the day.
 - Scenes: a column for the roles on stage; capsules can be marked as spares.
+- Setlists: a song library (title, key, tempo, length, lead vocal, line-up, light and sound cue,
+  colour, notes) and any number of setlists that use its songs, so a change shows everywhere.
+  Titles typed into a setlist go into the library. Special entries: break, announcement,
+  changeover, encore. Transitions gap, attacca and segue; start time and gap per setlist give the
+  time of day of every entry, set lengths, music time, total and end. Duplicate a setlist (e.g. for
+  a shorter festival set), a logo per setlist.
+- Setlist prints on one page with the type as large as fits (warning when it does not fit even at
+  the smallest size): themes Stage (big titles and keys for the floor), Technical / FOH (times,
+  tempo, line-up, cues) and Elegant (serif, centred).
+- Demo band show "Northbound Static" (start page): 16 songs, a club show and a festival set.

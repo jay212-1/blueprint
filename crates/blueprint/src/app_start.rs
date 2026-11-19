@@ -44,6 +44,13 @@ impl App {
                     {
                         self.open_demo();
                     }
+                    if ui
+                        .link(RichText::new("Try the demo band show \"Northbound Static\"").color(theme::MUTED))
+                        .on_hover_text("A song library and two setlists: a club show and a festival set")
+                        .clicked()
+                    {
+                        self.open_demo_band();
+                    }
                     if self.untitled_recovery.is_some() {
                         ui.add_space(12.0);
                         egui::Frame::new()

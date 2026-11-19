@@ -87,3 +87,68 @@ fn cards_and_swaps() {
     assert!(rows.iter().any(|r| r["warn"] == true), "the tight swap is marked");
     assert!(rows.iter().any(|r| r["cells"][5] == "Quick change SL"));
 }
+
+#[test]
+fn setlists_fit_one_page_in_every_theme() {
+    let mut p = bp_core::demo::band();
+    let ids: Vec<u64> = p.setlists.iter().map(|s| s.id).collect();
+    for id in &ids {
+        let doc = Doc::Setlist(*id);
+        for theme in doc.themes() {
+            let opts = Options { theme: *theme, ..Options::for_doc(doc) };
+            let printed = print(&p, doc, &opts).unwrap_or_else(|e| panic!("{theme:?}: {e}"));
+            assert_eq!(printed.pages(), 1, "{theme:?}");
+            assert!(printed.warnings.is_empty(), "{:?}", printed.warnings);
+            let fit = printed.fit.expect("the template reports its size");
+            assert!(fit >= 6.0, "{theme:?} {fit}");
+            let name = &p.setlist(*id).unwrap().name;
+            out(&format!("Setlist-{name}-{theme:?}"), &printed);
+        }
+    }
+    // The festival set is shorter, so its type is larger.
+    let size = |p: &bp_core::model::Project, id| {
+        let doc = Doc::Setlist(id);
+        print(p, doc, &Options::for_doc(doc)).unwrap().fit.unwrap()
+    };
+    assert!(size(&p, ids[1]) > size(&p, ids[0]));
+
+    // Data: numbers, specials, transitions, times of day.
+    let d = build(&p, Doc::Setlist(ids[0]), &Options::for_doc(Doc::Setlist(ids[0])));
+    let e = d.get()["entries"].as_array().unwrap();
+    assert_eq!(e[0]["kind"], "announcement");
+    assert_eq!(e[0]["clock"], "20:30");
+    assert_eq!(e[1]["no"], "1");
+    assert_eq!(e[1]["next"], "→");
+    assert_eq!(d.get()["parts"].as_array().unwrap().len(), 3);
+
+    // Far too long for one page: it says so.
+    let id = ids[0];
+    let more = p.setlist(id).unwrap().entries.clone();
+    for _ in 0..6 {
+        let mut copy = more.clone();
+        for e in &mut copy {
+            e.id = p.alloc_id();
+        }
+        p.setlist_mut(id).unwrap().entries.extend(copy);
+    }
+    let doc = Doc::Setlist(id);
+    let printed = print(&p, doc, &Options { theme: Theme::Technical, ..Options::for_doc(doc) }).unwrap();
+    assert!(printed.pages() > 1);
+    assert_eq!(printed.warnings.len(), 1, "{:?}", printed.warnings);
+}
+
+#[test]
+fn a_setlist_with_a_logo() {
+    let mut p = bp_core::demo::band();
+    let svg = br##"<svg xmlns="http://www.w3.org/2000/svg" width="40" height="40"><circle cx="20" cy="20" r="18" fill="#1d5fa0"/></svg>"##;
+    p.setlists[0].set_logo(svg);
+    let doc = Doc::Setlist(p.setlists[0].id);
+    for theme in doc.themes() {
+        let printed = print(&p, doc, &Options { theme: *theme, ..Options::for_doc(doc) }).unwrap();
+        assert_eq!(printed.pages(), 1);
+        out(&format!("Setlist-logo-{theme:?}"), &printed);
+    }
+    // Something that is not a picture is left out instead of failing.
+    p.setlists[0].set_logo(b"not an image");
+    assert!(print(&p, doc, &Options::for_doc(doc)).is_ok());
+}

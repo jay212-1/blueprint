@@ -22,6 +22,8 @@ pub enum Doc {
     Frequencies,
     DcaSheet,
     BatteryPlan,
+    /// One setlist (by id).
+    Setlist(bp_core::model::Id),
 }
 
 impl Doc {
@@ -42,6 +44,7 @@ impl Doc {
             Doc::Frequencies => "Frequency list",
             Doc::DcaSheet => "DCA sheet",
             Doc::BatteryPlan => "Battery plan",
+            Doc::Setlist(_) => "Setlist",
         }
     }
 
@@ -54,8 +57,22 @@ impl Doc {
         match self {
             Doc::MicPlot => "mic-plot.typ",
             Doc::MicCards => "mic-cards.typ",
+            Doc::Setlist(_) => "setlist.typ",
             _ => "table.typ",
         }
+    }
+
+    /// The themes offered for this document.
+    pub fn themes(self) -> &'static [Theme] {
+        match self {
+            Doc::Setlist(_) => &[Theme::Stage, Theme::Technical, Theme::Elegant],
+            _ => &[Theme::Stage, Theme::Technical, Theme::Ink],
+        }
+    }
+
+    /// Prints that keep the plan's revision (the mic plan's).
+    pub fn has_revision(self) -> bool {
+        !matches!(self, Doc::Setlist(_))
     }
 }
 
@@ -105,16 +122,39 @@ pub enum Theme {
     Technical,
     /// Black and white, no fills.
     Ink,
+    /// Serif and centred (setlists for guests and programmes).
+    Elegant,
 }
 
 impl Theme {
-    pub const ALL: [Theme; 3] = [Theme::Stage, Theme::Technical, Theme::Ink];
+    pub const ALL: [Theme; 4] = [Theme::Stage, Theme::Technical, Theme::Ink, Theme::Elegant];
 
     pub fn label(self) -> &'static str {
         match self {
             Theme::Stage => "Stage",
             Theme::Technical => "Technical",
             Theme::Ink => "Save ink",
+            Theme::Elegant => "Elegant",
+        }
+    }
+
+    /// What the theme is for (shown when the pointer rests on it).
+    pub fn hint(self, doc: Doc) -> &'static str {
+        match (self, doc) {
+            (Theme::Stage, Doc::Setlist(_)) => "For the floor: big titles, keys and transitions",
+            (Theme::Technical, Doc::Setlist(_)) => "For FOH and the crew: times, tempo, line-up and cues",
+            (Theme::Stage, _) => "Big type, high contrast: for the wings and quick changes",
+            (Theme::Technical, _) => "Compact, every detail",
+            (Theme::Ink, _) => "Black and white, no fills",
+            (Theme::Elegant, _) => "Serif and centred: for guests, programmes and the client",
+        }
+    }
+
+    /// The label used for this document ("Technical" is "FOH" on setlists).
+    pub fn label_for(self, doc: Doc) -> &'static str {
+        match (self, doc) {
+            (Theme::Technical, Doc::Setlist(_)) => "Technical / FOH",
+            _ => self.label(),
         }
     }
 
@@ -123,6 +163,7 @@ impl Theme {
             Theme::Stage => "stage",
             Theme::Technical => "technical",
             Theme::Ink => "ink",
+            Theme::Elegant => "elegant",
         }
     }
 }
@@ -141,13 +182,17 @@ impl Options {
         Options {
             paper: Paper::A4,
             landscape: doc.landscape(),
-            theme: Theme::Technical,
+            theme: match doc {
+                Doc::Setlist(_) => Theme::Stage,
+                _ => Theme::Technical,
+            },
             mark_changes: true,
         }
     }
 }
 
-const TEMPLATES: [(&str, &str); 4] = [
+const TEMPLATES: [(&str, &str); 5] = [
+    ("setlist.typ", include_str!("../templates/setlist.typ")),
     ("common.typ", include_str!("../templates/common.typ")),
     ("mic-plot.typ", include_str!("../templates/mic-plot.typ")),
     ("mic-cards.typ", include_str!("../templates/mic-cards.typ")),
@@ -182,6 +227,8 @@ fn engine() -> &'static TypstEngine<TypstTemplateCollection> {
 pub struct Printed {
     doc: PagedDocument,
     pub warnings: Vec<String>,
+    /// The type size (pt) a setlist was fitted at.
+    pub fit: Option<f64>,
 }
 
 impl Printed {
@@ -226,19 +273,60 @@ impl Printed {
 /// Lay out `doc` for the project.
 pub fn print(p: &bp_core::model::Project, doc: Doc, opts: &Options) -> Result<Printed, String> {
     let data = build(p, doc, opts);
-    compile(doc, &data)
+    let logo = match doc {
+        Doc::Setlist(id) => p.setlist(id).and_then(|s| s.logo_bytes()).filter(|b| is_image(b)),
+        _ => None,
+    };
+    compile_with(doc, &data, logo)
+}
+
+/// PNG, JPEG, GIF or SVG (anything else would stop the layout).
+pub fn is_image(b: &[u8]) -> bool {
+    b.starts_with(b"\x89PNG")
+        || b.starts_with(&[0xff, 0xd8, 0xff])
+        || b.starts_with(b"GIF8")
+        || std::str::from_utf8(&b[..b.len().min(512)]).is_ok_and(|t| t.contains("<svg"))
 }
 
 /// Lay out already built data (the tests look at the data too).
 pub fn compile(doc: Doc, data: &Data) -> Result<Printed, String> {
+    compile_with(doc, data, None)
+}
+
+fn compile_with(doc: Doc, data: &Data, logo: Option<Vec<u8>>) -> Result<Printed, String> {
     let json = serde_json::to_string(&data.0).map_err(|e| e.to_string())?;
     let mut inputs = Dict::new();
     inputs.insert("data".into(), json.into_value());
+    if let Some(l) = logo {
+        inputs.insert("logo".into(), typst::foundations::Bytes::new(l).into_value());
+    }
     let out = engine().compile_with_input::<_, _, PagedDocument>(doc.template(), inputs);
-    let warnings = out.warnings.iter().map(|w| w.message.to_string()).collect();
+    let mut warnings: Vec<String> = out.warnings.iter().map(|w| w.message.to_string()).collect();
     match out.output {
-        Ok(doc) => Ok(Printed { doc, warnings }),
+        Ok(d) => {
+            let fit = fit_size(&d);
+            if let (Doc::Setlist(_), true) = (doc, d.pages().len() > 1) {
+                warnings.push(
+                    "The setlist does not fit on one page even at the smallest type: shorten it, choose a larger paper or another theme."
+                        .into(),
+                );
+            }
+            Ok(Printed { doc: d, warnings, fit })
+        }
         Err(e) => Err(format!("The print layout failed: {e}")),
+    }
+}
+
+/// The type size the template chose to fit the page (`<fit-size>`).
+fn fit_size(d: &PagedDocument) -> Option<f64> {
+    use typst::introspection::Introspector as _;
+    let label = typst::foundations::Label::new(typst::utils::PicoStr::intern("fit-size"))?;
+    let found = d.introspector().query_label(label).ok()?;
+    let meta = found.to_packed::<typst::introspection::MetadataElem>()?;
+    match &meta.value {
+        typst::foundations::Value::Float(f) => Some(*f),
+        typst::foundations::Value::Int(i) => Some(*i as f64),
+        _ => None,
     }
 }
 

@@ -9,5 +9,6 @@ pub mod mic;
 pub mod mic_grid;
 pub mod model;
 pub mod project;
+pub mod setlist;
 pub mod sheet;
 pub mod time;
