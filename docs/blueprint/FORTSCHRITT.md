@@ -127,8 +127,28 @@ ziehen, R drücken, im Feld „Inputs“ „25“ eintragen, ein Symbol aus „A
 **Offen / bewusst später:** Symbole frei skalieren per Maus (geht über Breite/Tiefe in der
 Tabelle), eigene Symbole/Bilder, Mehrfachauswahl auf der Bühne.
 
-## Als Nächstes: M6 – Import/Export und Release
+## M6 – Import/Export (in 0.1.0, 2026-11-19) ✅, Release offen
 
-CSV/TSV/XLSX-Import mit Spaltenzuordnung, Gesamt-PDF mit Inhaltsverzeichnis, CSV- und PNG-Export,
-Austauschformat für die Suite (Kanalnamen, Patch, DCA), Packaging Linux/Windows, Dry-Run, erster
-Release nach deiner Freigabe.
+- Import in jede Tabelle (Stammdaten, Patch, Songs, Setlisten, alle Pläne): CSV, TSV, Text
+  (UTF-8, UTF-16, Windows-1252; Trennzeichen wird erkannt) und Tabellen (XLSX, XLS, ODS, mit
+  Blattwahl). Spalten werden über die Titel zugeordnet (auch deutsche wie „Kürzel“, „Notizen“,
+  „Farbe“, „Kanal“) und lassen sich vor dem Import ändern; Vorschau der ersten Zeilen. Was nicht
+  passt, wird pro Zeile und Spalte gemeldet; ein Undo nimmt den ganzen Import zurück.
+- „Export CSV…“ über jeder Tabelle (mit BOM für Excel).
+- Production pack: Deckblatt mit Inhaltsverzeichnis und den gewählten Drucken in einem PDF, jeder
+  mit seinem eigenen Papier und Theme. Standard: alles mit Inhalt außer Mic-Cards und Etiketten.
+- Stageplot als PNG (aus M5).
+- Austauschdatei für die Live-Tools (Production › „Export exchange file…“, `.showtime.json`):
+  Kanalnamen, Patch, Mikrofonplan pro Szene, DCAs. Beschrieben in `exchange-format.md`.
+- Windows-Installer verknüpft `.blueprint`-Dateien.
+- Probelauf `./release.sh dry-run` auf dem Mac: Programm (x86_64, 9 min) und DMG gebaut,
+  `Blueprint-0.1.0.dmg` 25 MB; Windows und Linux baut der Arch-PC.
+- Tests: 64 Kern-Tests, 8 Druck-Tests, 17 UI-Tests.
+
+**Zum Testen:** Eine Excel- oder CSV-Liste (z. B. Input-Liste mit „Kanal, Name, Mikro, Phantom“)
+über „Import…“ im Input patch laden, die Zuordnung prüfen, importieren, Cmd+Z. „Print / PDF“ ›
+„Production pack“: Häkchen setzen, PDF exportieren. Production › „Export exchange file…“.
+
+**Offen:** erster Release nach deiner Freigabe (Linux und Windows baut der Arch-PC), danach der
+Launcher-Katalog im Release-Repo der Suite. Ob das Austauschformat in ein gemeinsames Crate der
+Suite wandert (damit Show Master es direkt liest), entscheiden wir noch.
