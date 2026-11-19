@@ -8,7 +8,15 @@ use crate::model::Project;
 use crate::project::{self, FileError};
 use std::collections::VecDeque;
 use std::path::{Path, PathBuf};
+use std::sync::atomic::{AtomicU64, Ordering};
 use std::time::{Duration, Instant};
+
+/// A number that is new for every state of every open project (caches of
+/// worked-out views and print previews compare it).
+fn next_generation() -> u64 {
+    static NEXT: AtomicU64 = AtomicU64::new(1);
+    NEXT.fetch_add(1, Ordering::Relaxed)
+}
 
 /// Undo steps kept.
 pub const UNDO_LIMIT: usize = 200;
@@ -20,6 +28,8 @@ pub struct Document {
     pub project: Project,
     pub path: Option<PathBuf>,
     pub dirty: bool,
+    /// Changes with every edit, undo and redo.
+    pub generation: u64,
     undo: VecDeque<Project>,
     redo: Vec<Project>,
     last: Option<(String, Instant)>,
@@ -29,6 +39,7 @@ impl Document {
     pub fn new(project: Project) -> Self {
         Self {
             project,
+            generation: next_generation(),
             ..Self::default()
         }
     }
@@ -37,6 +48,7 @@ impl Document {
         Ok(Self {
             project: project::load(path)?,
             path: Some(path.to_path_buf()),
+            generation: next_generation(),
             ..Self::default()
         })
     }
@@ -61,6 +73,7 @@ impl Document {
         self.last = Some((key.to_string(), now));
         self.redo.clear();
         self.dirty = true;
+        self.generation = next_generation();
         r
     }
 
@@ -86,6 +99,7 @@ impl Document {
             .push(std::mem::replace(&mut self.project, prev));
         self.last = None;
         self.dirty = true;
+        self.generation = next_generation();
         true
     }
 
@@ -97,6 +111,7 @@ impl Document {
             .push_back(std::mem::replace(&mut self.project, next));
         self.last = None;
         self.dirty = true;
+        self.generation = next_generation();
         true
     }
 

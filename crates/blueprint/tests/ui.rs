@@ -4,6 +4,7 @@
 #![allow(clippy::unwrap_used, clippy::expect_used, clippy::panic)]
 
 use blueprint::{App, Page};
+use bp_core::mic_grid::MicSheet;
 use bp_core::sheet::Sheet;
 use egui::{Event, Key, Modifiers};
 use egui_kittest::kittest::Queryable;
@@ -160,7 +161,7 @@ fn roles_link_to_the_cast() {
     settle(&mut h);
     h.input_mut()
         .events
-        .push(Event::Paste("Elphaba\tAnna Berg\tTK (cover)".into()));
+        .push(Event::Paste("Mara\tAnna Berg\tTK (cover)".into()));
     settle(&mut h);
     let p = project(&h);
     assert_eq!(p.roles.len(), 1);
@@ -180,7 +181,7 @@ fn save_reopen_and_recover() {
         .doc
         .as_mut()
         .unwrap()
-        .edit("meta:production", |p| p.meta.production = "Wicked".into());
+        .edit("meta:production", |p| p.meta.production = "Harbour Lights".into());
     assert!(h.state_mut().save_to(Some(&path)));
     assert!(!h.state().doc.as_ref().unwrap().dirty);
 
@@ -198,6 +199,101 @@ fn save_reopen_and_recover() {
     h.get_by_label("Recover").click();
     settle(&mut h);
     let p = project(&h);
-    assert_eq!(p.meta.production, "Wicked");
+    assert_eq!(p.meta.production, "Harbour Lights");
     assert_eq!(p.meta.venue, "Stadttheater");
+}
+
+fn demo(h: &mut Harness<'static, App>) {
+    h.get_by_label_contains("Try the demo musical").click();
+    settle(h);
+    assert_eq!(h.state().page, Page::Mic(MicSheet::Plot));
+}
+
+#[test]
+fn demo_mic_plot_and_checks() {
+    let mut h = harness();
+    demo(&mut h);
+    shot(&mut h, "mic-plot");
+    // The demo has one intended problem: a swap that is too tight.
+    h.get_by_label_contains("Checks: 1 problem").click();
+    settle(&mut h);
+    h.get_by_label_contains("only 0:25");
+    shot(&mut h, "checks");
+    h.get_by_label("Show").click();
+    settle(&mut h);
+    assert_eq!(h.state().page, Page::Mic(MicSheet::Plot));
+    let st = &h.state().tables["mic:Plot"];
+    assert_eq!(st.cursor.0, 2, "scene 1.3");
+}
+
+#[test]
+fn typing_a_role_into_the_mic_plot() {
+    let mut h = harness();
+    demo(&mut h);
+    // Scene 2.3 (row 10), transmitter 13 (column 2 + 12): put Mara there.
+    {
+        let st = h.state_mut().tables.entry("mic:Plot".into()).or_default();
+        st.select(&[9]);
+        st.cursor = (9, 14);
+    }
+    settle(&mut h);
+    type_text(&mut h, "Mara");
+    key(&mut h, Key::Enter, Modifiers::NONE);
+    let p = project(&h);
+    let mara = p.roles[0].id;
+    let scene = p.scenes[9].id;
+    assert_eq!(p.mic.tx_in(scene, mara), Some(p.transmitters[12].id));
+    assert!(p.scenes[9].roles.contains(&mara), "Mara is now on stage in 2.3");
+    key(&mut h, Key::Z, Modifiers::COMMAND);
+    assert!(!project(&h).scenes[9].roles.contains(&mara));
+}
+
+#[test]
+fn a_spare_takes_over() {
+    let mut h = harness();
+    demo(&mut h);
+    h.state_mut().page = Page::Mic(MicSheet::Tracks);
+    settle(&mut h);
+    shot(&mut h, "tracks");
+    h.get_by_label("Swap in the spare").click();
+    settle(&mut h);
+    let p = project(&h);
+    // The first active transmitter (1) is out, the first spare (S1) takes over.
+    assert_eq!(p.transmitters[0].status, bp_core::model::TxStatus::Defect);
+    assert_eq!(p.mic.track(p.roles[0].id).and_then(|t| t.tx), Some(p.transmitters[14].id));
+}
+
+#[test]
+fn cast_of_the_day() {
+    let mut h = harness();
+    demo(&mut h);
+    h.state_mut().page = Page::Mic(MicSheet::Performers);
+    settle(&mut h);
+    let cast_b = project(&h).mic.variants[0].id;
+    h.state_mut().doc.as_mut().unwrap().edit("t", |p| p.mic.variant = Some(cast_b));
+    settle(&mut h);
+    shot(&mut h, "performers-cast-b");
+    let v = h.state_mut().mic_view();
+    let mia = project(&h).cast[6].id;
+    assert!(!v.person_txs(mia).is_empty(), "Mia wears Mara's transmitter in Cast B");
+}
+
+#[test]
+fn print_preview_and_pdf() {
+    let mut h = harness();
+    demo(&mut h);
+    h.state_mut().page = Page::Print;
+    settle(&mut h);
+    h.get_by_label_contains("page").hover();
+    shot(&mut h, "print-mic-plot");
+    h.get_by_label("Mic cards").click();
+    settle(&mut h);
+    shot(&mut h, "print-mic-cards");
+    h.get_by_label("Issue Rev 1").click();
+    settle(&mut h);
+    assert_eq!(project(&h).mic.revision.number, 1);
+    let dir = tempfile::tempdir().unwrap();
+    let pdf = dir.path().join("plot.pdf");
+    assert!(h.state_mut().export_pdf(bp_print::Doc::MicPlot, &pdf));
+    assert!(std::fs::read(&pdf).unwrap().starts_with(b"%PDF"));
 }

@@ -12,6 +12,9 @@ several locations and more, all printable as PDF. Rust + egui, built like the ot
 
 ## Version and changelog with every change
 
+**Exception for now:** while the milestones of the first Blueprint prompt (M2–M6) are being built,
+the version stays at 0.1.0 and new items go into the `## 0.1.0` section (Jan's wish, 2026-11-19).
+
 - Every change raises the version in the root `Cargo.toml` (`[workspace.package] version`), then
   `cargo update -w` so `Cargo.lock` follows. Small changes: patch step; bigger features: minor step.
 - Add a `## x.y.z` section at the top of `CHANGELOG.md` (English).
@@ -43,6 +46,12 @@ Showtime Suite installs, updates and starts the others; its catalog is `showtime
 - `crates/bp-core` – model (stable `u64` ids, plans refer to ids only), project file (JSON with
   `schema_version` and migrations, atomic save, backups, autosave / recovery), undo stack, tables
   (`sheet.rs`: columns, TSV copy / paste), times and numbers.
+- `crates/bp-core/src/mic.rs` – the mic plan (usual transmitter per role, exceptions per scene,
+  casts of the day, swaps, DCAs, batteries) and `MicView`, which works out the matrix, swaps and
+  problems; `mic_grid.rs` shows it as tables; `grid.rs` is the table interface all lists share;
+  `demo.rs` the demo musical.
+- `crates/bp-print` – Typst printing: `templates/*.typ` (layout and themes, kept apart from the
+  code), `fonts/` (OFL, embedded), `data.rs` (plans to JSON for the templates).
 - `crates/blueprint` – the egui app: `app.rs` (window, project actions), `app_*.rs` (pages),
   `table.rs` (reusable spreadsheet editor that emits `Action`s), `theme.rs` (suite colours),
   `settings.rs` (`BLUEPRINT_CONFIG_DIR` redirects them; tests never touch the real settings).

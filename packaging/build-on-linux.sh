@@ -31,6 +31,7 @@ TAR="dist/$NAME.tar.gz"
 make_tar() {
   rm -rf "dist/$NAME" && mkdir -p "dist/$NAME"
   cp "$BIN" README.md packaging/linux/blueprint.desktop "dist/$NAME/"
+  mkdir -p "dist/$NAME/font-licenses" && cp crates/bp-print/fonts/*LICENSE* crates/bp-print/fonts/*OFL* "dist/$NAME/font-licenses/"
   cp assets/icon.png "dist/$NAME/blueprint.png"
   tar -C dist -czf "$TAR" "$NAME" && rm -rf "dist/$NAME"
 }
@@ -48,7 +49,8 @@ if [ -z "${SKIP_WINDOWS:-}" ]; then
   export WINEDEBUG=-all WINEDLLOVERRIDES="mscoree,mshtml="
   SETUP="dist/Blueprint-Setup-$V.exe"
   make_setup() {
-    rm -rf stage && mkdir -p stage && cp "$EXE" README.md stage/
+    rm -rf stage && mkdir -p stage/font-licenses && cp "$EXE" README.md stage/
+    cp crates/bp-print/fonts/*LICENSE* crates/bp-print/fonts/*OFL* stage/font-licenses/
     "$WINE" "$ISCC" "/DAppVersion=$V" "Z:$(pwd)/packaging/windows/blueprint.iss"
     rm -rf stage
   }

@@ -34,7 +34,7 @@ for a in $ARCHS; do
 done
 
 DMG="dist/Blueprint-$V.dmg"
-KEY="$V-$(ui_fingerprint "${BINS[@]}" packaging/macos/Info.plist assets/icon.png)"
+KEY="$V-$(ui_fingerprint "${BINS[@]}" packaging/macos/Info.plist assets/icon.png crates/bp-print/fonts/Inter-LICENSE.txt)"
 make_dmg() {
   WORK=$(mktemp -d)
   APP="$WORK/dmg/Blueprint.app"
@@ -48,6 +48,9 @@ make_dmg() {
     sips -z $((s*2)) $((s*2)) assets/icon.png --out "$ICONSET/icon_${s}x${s}@2x.png" >/dev/null
   done
   iconutil -c icns "$ICONSET" -o "$APP/Contents/Resources/Blueprint.icns"
+  # Licences of the fonts built into the prints (SIL OFL).
+  mkdir -p "$APP/Contents/Resources/font-licenses"
+  cp crates/bp-print/fonts/*LICENSE* crates/bp-print/fonts/*OFL* "$APP/Contents/Resources/font-licenses/"
   # Ad-hoc signature: macOS asks once for "Open Anyway".
   codesign --force --deep -s - "$APP"
   ln -s /Applications "$WORK/dmg/Applications"

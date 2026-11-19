@@ -2,6 +2,7 @@
 //! transmitters, capsules, locations). Plans refer to these by id only, so a
 //! renamed role is renamed everywhere.
 
+use crate::mic::MicPlan;
 use serde::{Deserialize, Serialize};
 
 /// Current project file schema. Raise it with every incompatible change and
@@ -26,6 +27,7 @@ pub struct Project {
     pub transmitters: Vec<Transmitter>,
     pub capsules: Vec<Capsule>,
     pub locations: Vec<Location>,
+    pub mic: MicPlan,
 }
 
 impl Default for Project {
@@ -40,6 +42,7 @@ impl Default for Project {
             transmitters: Vec::new(),
             capsules: Vec::new(),
             locations: Vec::new(),
+            mic: MicPlan::default(),
         }
     }
 }
@@ -83,16 +86,20 @@ impl Project {
             .find(|r| !n.is_empty() && r.name.trim().eq_ignore_ascii_case(n))
     }
 
-    /// Remove references to people that no longer exist (after deleting cast).
+    /// Remove references to things that no longer exist (after deleting rows).
     pub fn prune(&mut self) {
         let people: Vec<Id> = self.cast.iter().map(|p| p.id).collect();
         let roles: Vec<Id> = self.roles.iter().map(|r| r.id).collect();
+        let scenes: Vec<Id> = self.scenes.iter().map(|s| s.id).collect();
+        let txs: Vec<Id> = self.transmitters.iter().map(|t| t.id).collect();
+        let capsules: Vec<Id> = self.capsules.iter().map(|c| c.id).collect();
         for r in &mut self.roles {
             r.casting.retain(|c| people.contains(&c.person));
         }
         for s in &mut self.scenes {
             s.roles.retain(|r| roles.contains(r));
         }
+        self.mic.prune(&people, &roles, &scenes, &txs, &capsules);
     }
 }
 
@@ -288,6 +295,8 @@ pub struct Capsule {
     /// Colour of the capsule (skin tones: "beige", "cocoa" …).
     pub color: String,
     pub serial: String,
+    /// A backup capsule.
+    pub spare: bool,
     pub notes: String,
 }
 

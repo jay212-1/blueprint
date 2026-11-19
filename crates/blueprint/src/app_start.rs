@@ -36,6 +36,14 @@ impl App {
                             self.open(None);
                         }
                     });
+                    ui.add_space(6.0);
+                    if ui
+                        .link(RichText::new("Try the demo musical \"The Lighthouse Keeper\"").color(theme::MUTED))
+                        .on_hover_text("12 performers, 15 scenes, 16 transmitters, swaps and casts of the day")
+                        .clicked()
+                    {
+                        self.open_demo();
+                    }
                     if self.untitled_recovery.is_some() {
                         ui.add_space(12.0);
                         egui::Frame::new()

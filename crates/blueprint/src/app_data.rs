@@ -5,6 +5,7 @@ use crate::app::App;
 use crate::table::{self, Action, TableView};
 use crate::theme;
 use bp_core::model::Meta;
+use bp_core::grid::{self, Grid};
 use bp_core::sheet::Sheet;
 use egui::RichText;
 
@@ -52,32 +53,7 @@ impl App {
     }
 
     pub(crate) fn sheet_page(&mut self, ui: &mut egui::Ui, sheet: Sheet) {
-        let Some(doc) = self.doc.as_ref() else { return };
-        let len = sheet.len(&doc.project);
-        let state = self.tables.entry(sheet).or_default();
-        let selected = state.selected.len();
-        let mut actions = Vec::new();
-        ui.horizontal(|ui| {
-            ui.heading(sheet.title());
-            ui.add_space(12.0);
-            if ui
-                .button(format!("Add {}", sheet.noun()))
-                .on_hover_text("Insert a row below the cursor (Cmd/Ctrl+Enter)")
-                .clicked()
-            {
-                let at = if len == 0 { 0 } else { state.cursor.0 + 1 };
-                actions.push(Action::Insert { at });
-            }
-            if ui
-                .add_enabled(len > 0 && selected > 0, egui::Button::new("Delete"))
-                .on_hover_text("Delete the selected rows (Cmd/Ctrl+Backspace)")
-                .clicked()
-            {
-                actions.push(Action::Delete {
-                    rows: state.selected.iter().copied().collect(),
-                });
-            }
-        });
+        ui.heading(sheet.title());
         ui.label(
             RichText::new(
                 "Enter edits · Tab moves on · Cmd/Ctrl+C / V copies and pastes rows from Excel or Numbers · drag the row number to reorder",
@@ -86,49 +62,85 @@ impl App {
             .color(theme::MUTED),
         );
         ui.add_space(6.0);
-
-        let p = &doc.project;
-        let columns = sheet.columns();
-        let people: Vec<String> = p.cast.iter().map(|x| x.name.clone()).collect();
-        let text = |r: usize, c: usize| sheet.text(p, r, c);
-        let color = |r: usize| theme::color(&sheet.color(p, r));
         let hint = format!(
             "No {} yet. Click \"Add {}\" or paste rows from a spreadsheet (click here, then Cmd/Ctrl+V).",
             sheet.title().to_lowercase(),
             sheet.noun()
         );
+        self.table(ui, &sheet, Some(sheet.noun()), &hint);
+    }
+
+    /// A grid in the table editor, with Add / Delete buttons where rows can
+    /// be added. Edits go through [`App::apply`] (with undo).
+    pub(crate) fn table(&mut self, ui: &mut egui::Ui, grid: &dyn Grid, add: Option<&str>, empty_hint: &str) {
+        let Some(doc) = self.doc.as_ref() else { return };
+        let key = grid.key();
+        let p = &doc.project;
+        let len = grid.len(p);
+        let state = self.tables.entry(key.clone()).or_default();
+        let mut actions = Vec::new();
+        if let (Some(noun), true) = (add, grid.editable_rows()) {
+            let selected = state.selected.len();
+            ui.horizontal(|ui| {
+                if ui
+                    .button(format!("Add {noun}"))
+                    .on_hover_text("Insert a row below the cursor (Cmd/Ctrl+Enter)")
+                    .clicked()
+                {
+                    let at = if len == 0 { 0 } else { state.cursor.0 + 1 };
+                    actions.push(Action::Insert { at });
+                }
+                if ui
+                    .add_enabled(len > 0 && selected > 0, egui::Button::new("Delete"))
+                    .on_hover_text("Delete the selected rows (Cmd/Ctrl+Backspace)")
+                    .clicked()
+                {
+                    actions.push(Action::Delete {
+                        rows: state.selected.iter().copied().collect(),
+                    });
+                }
+            });
+            ui.add_space(4.0);
+        }
+        let columns = grid.columns(p);
+        let people: Vec<String> = p.cast.iter().map(|x| x.name.clone()).collect();
+        let text = |r: usize, c: usize| grid.text(p, r, c);
+        let color = |r: usize| theme::color(&grid.color(p, r));
+        let mark = |r: usize, c: usize| grid.mark(p, r, c);
         let view = TableView {
-            id: egui::Id::unique(("sheet", sheet)),
+            id: egui::Id::unique(("table", &key)),
             columns: &columns,
             rows: len,
             text: &text,
             color: &color,
             people: &people,
-            empty_hint: &hint,
+            empty_hint,
+            mark: &mark,
+            rows_editable: grid.editable_rows(),
         };
         actions.extend(table::show(ui, state, &view));
         for a in actions {
-            self.apply(sheet, a);
+            self.apply(grid, a);
         }
     }
 
     /// Apply a table action to the project (one undo step each, typing in a
     /// cell merges).
-    pub fn apply(&mut self, sheet: Sheet, action: Action) {
+    pub fn apply(&mut self, grid: &dyn Grid, action: Action) {
         let Some(doc) = self.doc.as_mut() else { return };
-        let state = self.tables.entry(sheet).or_default();
+        let key = grid.key();
+        let state = self.tables.entry(key.clone()).or_default();
         let mut message = None;
         match action {
             Action::Set { row, col, value } => {
-                let id = sheet.id(&doc.project, row).unwrap_or(0);
-                let r = doc.edit(&format!("{sheet:?}:{id}:{col}"), |p| sheet.set(p, row, col, &value));
+                let r = doc.edit(&format!("{key}:{row}:{col}"), |p| grid.set(p, row, col, &value));
                 if let Err(e) = r {
                     message = Some(e);
                 }
             }
             Action::Paste { row, col, text } => {
                 doc.seal();
-                let (rows, errors) = doc.edit("paste", |p| sheet.paste(p, row, col, &text));
+                let (rows, errors) = doc.edit("paste", |p| grid::paste(grid, p, row, col, &text));
                 doc.seal();
                 state.select(&rows);
                 if !errors.is_empty() {
@@ -144,17 +156,23 @@ impl App {
                 }
             }
             Action::Insert { at } => {
+                if !grid.editable_rows() {
+                    return;
+                }
                 doc.seal();
-                let row = doc.edit("insert", |p| sheet.insert(p, at));
+                let row = doc.edit("insert", |p| grid.insert(p, at));
                 doc.seal();
                 state.edit_new(row, 0);
             }
             Action::Delete { rows } => {
+                if !grid.editable_rows() {
+                    return;
+                }
                 doc.seal();
-                doc.edit("delete", |p| sheet.remove(p, &rows));
+                doc.edit("delete", |p| grid.remove(p, &rows));
                 doc.seal();
                 let first = rows.iter().min().copied().unwrap_or(0);
-                let len = sheet.len(&doc.project);
+                let len = grid.len(&doc.project);
                 if len > 0 {
                     state.select(&[first.min(len - 1)]);
                 } else {
@@ -162,8 +180,11 @@ impl App {
                 }
             }
             Action::Move { rows, to } => {
+                if !grid.editable_rows() {
+                    return;
+                }
                 doc.seal();
-                let new = doc.edit("move", |p| sheet.move_rows(p, &rows, to));
+                let new = doc.edit("move", |p| grid.move_rows(p, &rows, to));
                 doc.seal();
                 state.select(&new);
             }

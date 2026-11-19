@@ -7,6 +7,9 @@ use crate::theme;
 use bp_core::document::Document;
 use bp_core::model::Project;
 use bp_core::project;
+use bp_core::mic::MicView;
+use bp_core::mic_grid::MicSheet;
+use bp_core::model::Id;
 use bp_core::sheet::Sheet;
 use egui::{Color32, Key, KeyboardShortcut, Modifiers, RichText, ViewportCommand};
 use std::collections::HashMap;
@@ -20,12 +23,16 @@ const AUTOSAVE_EVERY: Duration = Duration::from_secs(20);
 pub enum Page {
     Production,
     Sheet(Sheet),
+    Mic(MicSheet),
+    Checks,
+    Print,
 }
 
 /// What to do once unsaved changes are dealt with.
 #[derive(Clone, Debug, PartialEq)]
 enum After {
     New,
+    Demo,
     Open(Option<PathBuf>),
     Close,
     Quit,
@@ -44,7 +51,7 @@ enum Modal {
 pub struct App {
     pub doc: Option<Document>,
     pub page: Page,
-    pub tables: HashMap<Sheet, TableState>,
+    pub tables: HashMap<String, TableState>,
     pub settings: Settings,
     /// File dialogs (off in tests).
     pub dialogs: bool,
@@ -55,6 +62,11 @@ pub struct App {
     window_title: String,
     /// An untitled project that was not saved last time.
     pub untitled_recovery: Option<Project>,
+    /// The mic plan worked out for a document generation.
+    pub(crate) mic_cache: Option<(u64, std::sync::Arc<MicView>)>,
+    /// Transmitter out and spare chosen in the spare panel.
+    pub(crate) spare_pick: (Option<Id>, Option<Id>),
+    pub print: crate::app_print::PrintState,
 }
 
 impl App {
@@ -73,6 +85,9 @@ impl App {
             allow_close: false,
             window_title: String::new(),
             untitled_recovery,
+            mic_cache: None,
+            spare_pick: (None, None),
+            print: Default::default(),
         };
         if let Some(p) = open {
             app.open_path(&p);
@@ -85,6 +100,11 @@ impl App {
 
     pub fn new_project(&mut self) {
         self.request(After::New);
+    }
+
+    /// The demo musical, as an untitled project.
+    pub fn open_demo(&mut self) {
+        self.request(After::Demo);
     }
 
     /// Open a project file (asks first when there are unsaved changes).
@@ -109,6 +129,10 @@ impl App {
             After::New => {
                 self.set_doc(Document::new(Project::default()));
                 self.page = Page::Production;
+            }
+            After::Demo => {
+                self.set_doc(Document::new(bp_core::demo::musical()));
+                self.page = Page::Mic(MicSheet::Plot);
             }
             After::Open(Some(path)) => self.open_path(&path),
             After::Open(None) => {
@@ -360,12 +384,17 @@ impl App {
                 .resizable(false)
                 .exact_size(210.0)
                 .frame(egui::Frame::NONE.fill(theme::PANEL).inner_margin(egui::Margin::symmetric(10, 12)))
-                .show(ui, |ui| self.nav(ui));
+                .show(ui, |ui| {
+                    egui::ScrollArea::vertical().auto_shrink([false, false]).show(ui, |ui| self.nav(ui));
+                });
             egui::CentralPanel::default()
                 .frame(egui::Frame::NONE.fill(theme::BG).inner_margin(egui::Margin::symmetric(18, 14)))
                 .show(ui, |ui| match self.page {
                     Page::Production => self.production_page(ui),
                     Page::Sheet(s) => self.sheet_page(ui, s),
+                    Page::Mic(s) => self.mic_page(ui, s),
+                    Page::Checks => self.checks_page(ui),
+                    Page::Print => self.print_page(ui),
                 });
         }
         self.modals(&ctx);
@@ -422,7 +451,7 @@ impl App {
             let on = self.page == page;
             let w = ui.available_width();
             if ui
-                .add(egui::Button::selectable(on, label).min_size(egui::vec2(w, 30.0)))
+                .add(egui::Button::selectable(on, label).min_size(egui::vec2(w, 26.0)))
                 .clicked()
             {
                 self.page = page;
@@ -435,8 +464,31 @@ impl App {
             let n = self.doc.as_ref().map(|d| s.len(&d.project)).unwrap_or(0);
             item(ui, Page::Sheet(s), format!("{}  ({n})", s.title()));
         }
-        section(ui, "PLANS");
-        for p in ["Mic plan", "Setlists", "Patch", "Stage plot", "Run of show", "More plans"] {
+        section(ui, "MIC PLAN");
+        for s in MicSheet::ALL {
+            item(ui, Page::Mic(s), s.title().to_string());
+        }
+        section(ui, "");
+        let n = self.mic_view().problems.len();
+        let on = self.page == Page::Checks;
+        let label = if n == 0 {
+            RichText::new("Checks: all fine")
+        } else {
+            RichText::new(format!("Checks: {n} problem{}", if n == 1 { "" } else { "s" })).color(theme::WARN)
+        };
+        let w = ui.available_width();
+        if ui.add(egui::Button::selectable(on, label).min_size(egui::vec2(w, 28.0))).clicked() {
+            self.page = Page::Checks;
+        }
+        let on = self.page == Page::Print;
+        if ui
+            .add(egui::Button::selectable(on, RichText::new("Print / PDF").strong()).min_size(egui::vec2(w, 30.0)))
+            .clicked()
+        {
+            self.page = Page::Print;
+        }
+        section(ui, "MORE PLANS");
+        for p in ["Setlists", "Patch", "Stage plot", "Run of show", "More plans"] {
             ui.add_enabled(false, egui::Button::selectable(false, p).min_size(egui::vec2(ui.available_width(), 26.0)))
                 .on_disabled_hover_text("Coming in a later version");
         }

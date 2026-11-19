@@ -7,6 +7,7 @@ use crate::model::{
     Capsule, CapsuleKind, CastKind, Casting, Id, Location, Person, Project, Role, Scene,
     Transmitter, TxStatus, COLORS,
 };
+use crate::grid::{col, ColKind, Column, Grid};
 use crate::time::{format_duration, format_number, parse_duration, parse_number};
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
@@ -17,34 +18,6 @@ pub enum Sheet {
     Transmitters,
     Capsules,
     Locations,
-}
-
-/// What a column holds (decides the editor and the parsing).
-#[derive(Clone, Debug, PartialEq)]
-pub enum ColKind {
-    Text,
-    /// A number (e.g. a frequency in MHz).
-    Number,
-    /// A duration typed as "m:ss".
-    Duration,
-    /// One of [`COLORS`].
-    Color,
-    /// One of a fixed set of words.
-    Choice(Vec<&'static str>),
-    /// A person from the cast, by name.
-    Person,
-}
-
-#[derive(Clone, Debug, PartialEq)]
-pub struct Column {
-    pub title: &'static str,
-    pub kind: ColKind,
-    /// Suggested width in points.
-    pub width: f32,
-}
-
-fn col(title: &'static str, kind: ColKind, width: f32) -> Column {
-    Column { title, kind, width }
 }
 
 /// Anything with an id, so rows can be handled the same way.
@@ -206,6 +179,76 @@ fn parse_others(p: &Project, v: &str) -> Result<Vec<Casting>, String> {
     Ok(out)
 }
 
+/// "Mara, Lena" for role ids.
+pub fn roles_text(p: &Project, roles: &[Id]) -> String {
+    roles
+        .iter()
+        .filter_map(|r| p.role(*r))
+        .map(|r| r.name.clone())
+        .collect::<Vec<_>>()
+        .join(", ")
+}
+
+/// Role names separated by commas (or semicolons) to ids.
+pub fn parse_roles(p: &Project, v: &str) -> Result<Vec<Id>, String> {
+    let mut out = Vec::new();
+    for part in v.split([',', ';']) {
+        let part = part.trim();
+        if part.is_empty() {
+            continue;
+        }
+        let r = p
+            .role_named(part)
+            .ok_or_else(|| format!("no role named \"{part}\""))?;
+        if !out.contains(&r.id) {
+            out.push(r.id);
+        }
+    }
+    Ok(out)
+}
+
+/// "yes" / "x" / the column's word → true, "" / "no" → false.
+pub fn parse_flag(v: &str) -> Result<bool, String> {
+    match v.trim().to_ascii_lowercase().as_str() {
+        "" | "no" | "n" | "false" | "0" | "-" => Ok(false),
+        "yes" | "y" | "x" | "true" | "1" | "spare" => Ok(true),
+        other => Err(format!("\"{other}\" is not yes or no")),
+    }
+}
+
+impl Grid for Sheet {
+    fn key(&self) -> String {
+        format!("{self:?}")
+    }
+    fn columns(&self, _p: &Project) -> Vec<Column> {
+        Sheet::columns(*self)
+    }
+    fn len(&self, p: &Project) -> usize {
+        Sheet::len(*self, p)
+    }
+    fn text(&self, p: &Project, row: usize, col: usize) -> String {
+        Sheet::text(*self, p, row, col)
+    }
+    fn set(&self, p: &mut Project, row: usize, col: usize, value: &str) -> Result<(), String> {
+        Sheet::set(*self, p, row, col, value)
+    }
+    fn color(&self, p: &Project, row: usize) -> String {
+        Sheet::color(*self, p, row)
+    }
+    fn editable_rows(&self) -> bool {
+        true
+    }
+    fn insert(&self, p: &mut Project, at: usize) -> usize {
+        Sheet::insert(*self, p, at)
+    }
+    fn remove(&self, p: &mut Project, rows: &[usize]) {
+        Sheet::remove(*self, p, rows)
+    }
+    fn move_rows(&self, p: &mut Project, rows: &[usize], to: usize) -> Vec<usize> {
+        Sheet::move_rows(*self, p, rows, to)
+    }
+}
+
 impl Sheet {
     pub const ALL: [Sheet; 6] = [
         Sheet::Cast,
@@ -263,7 +306,8 @@ impl Sheet {
                 col("Page", Text, 60.0),
                 col("Start", Duration, 70.0),
                 col("Length", Duration, 70.0),
-                col("Notes", Text, 240.0),
+                col("On stage (roles)", Text, 280.0),
+                col("Notes", Text, 200.0),
             ],
             Sheet::Transmitters => vec![
                 col("Ch", Text, 50.0),
@@ -274,7 +318,7 @@ impl Sheet {
                 col("Battery", Text, 90.0),
                 col(
                     "Status",
-                    Choice(TxStatus::ALL.iter().map(|s| s.label()).collect()),
+                    Choice(TxStatus::ALL.iter().map(|s| s.label().to_string()).collect()),
                     80.0,
                 ),
                 col("Colour", Color, 90.0),
@@ -283,12 +327,13 @@ impl Sheet {
             Sheet::Capsules => vec![
                 col(
                     "Type",
-                    Choice(CapsuleKind::ALL.iter().map(|s| s.label()).collect()),
+                    Choice(CapsuleKind::ALL.iter().map(|s| s.label().to_string()).collect()),
                     90.0,
                 ),
                 col("Model", Text, 160.0),
                 col("Colour", Text, 90.0),
                 col("Serial", Text, 120.0),
+                col("Spare", Choice(vec![String::new(), "spare".into()]), 70.0),
                 col("Notes", Text, 240.0),
             ],
             Sheet::Locations => vec![
@@ -356,7 +401,8 @@ impl Sheet {
                 3 => r.page.clone(),
                 4 => opt_duration(r.start),
                 5 => opt_duration(r.duration),
-                6 => r.notes.clone(),
+                6 => roles_text(p, &r.roles),
+                7 => r.notes.clone(),
                 _ => String::new(),
             }),
             Sheet::Transmitters => p.transmitters.get(row).map(|r| match column {
@@ -376,7 +422,8 @@ impl Sheet {
                 1 => r.model.clone(),
                 2 => r.color.clone(),
                 3 => r.serial.clone(),
-                4 => r.notes.clone(),
+                4 => if r.spare { "spare".into() } else { String::new() },
+                5 => r.notes.clone(),
                 _ => String::new(),
             }),
             Sheet::Locations => p.locations.get(row).map(|r| match column {
@@ -449,6 +496,7 @@ impl Sheet {
             },
             Sheet::Scenes => {
                 let time = if column == 4 || column == 5 { parse_opt_duration(v)? } else { None };
+                let roles = if column == 6 { parse_roles(p, v)? } else { Vec::new() };
                 let r = &mut p.scenes[row];
                 match column {
                     0 => r.act = v.trim().to_string(),
@@ -457,7 +505,8 @@ impl Sheet {
                     3 => r.page = v.trim().to_string(),
                     4 => r.start = time,
                     5 => r.duration = time,
-                    6 => r.notes = v.to_string(),
+                    6 => r.roles = roles,
+                    7 => r.notes = v.to_string(),
                     _ => {}
                 }
             }
@@ -505,7 +554,8 @@ impl Sheet {
                     1 => r.model = v.trim().to_string(),
                     2 => r.color = v.trim().to_string(),
                     3 => r.serial = v.trim().to_string(),
-                    4 => r.notes = v.to_string(),
+                    4 => r.spare = parse_flag(v)?,
+                    5 => r.notes = v.to_string(),
                     _ => {}
                 }
             }
@@ -539,121 +589,12 @@ impl Sheet {
     pub fn move_rows(self, p: &mut Project, rows: &[usize], to: usize) -> Vec<usize> {
         with_rows_mut!(p, self, |v| move_rows(v, rows, to))
     }
-
-    /// The given rows as TSV (all columns).
-    pub fn copy(self, p: &Project, rows: &[usize]) -> String {
-        let cols = self.columns().len();
-        let grid: Vec<Vec<String>> = rows
-            .iter()
-            .map(|r| (0..cols).map(|c| self.text(p, *r, c)).collect())
-            .collect();
-        to_tsv(&grid)
-    }
-
-    /// Paste a TSV grid with its top left cell at (`row`, `column`); rows are
-    /// added at the end as needed. Returns the rows touched and one message
-    /// per cell that could not be read (those cells are left as they were).
-    pub fn paste(
-        self,
-        p: &mut Project,
-        row: usize,
-        column: usize,
-        tsv: &str,
-    ) -> (Vec<usize>, Vec<String>) {
-        let grid = parse_tsv(tsv);
-        let cols = self.columns();
-        let mut touched = Vec::new();
-        let mut errors = Vec::new();
-        for (i, cells) in grid.iter().enumerate() {
-            let r = row + i;
-            while self.len(p) <= r {
-                let n = self.len(p);
-                self.insert(p, n);
-            }
-            touched.push(r);
-            for (j, cell) in cells.iter().enumerate() {
-                let c = column + j;
-                if c >= cols.len() {
-                    break;
-                }
-                if let Err(e) = self.set(p, r, c, cell) {
-                    errors.push(format!("row {}, {}: {e}", r + 1, cols[c].title));
-                }
-            }
-        }
-        (touched, errors)
-    }
-}
-
-/// Cells to TSV; cells with tabs, line breaks or quotes are quoted (as Excel does).
-pub fn to_tsv(grid: &[Vec<String>]) -> String {
-    let cell = |s: &String| {
-        if s.contains(['\t', '\n', '\r', '"']) {
-            format!("\"{}\"", s.replace('"', "\"\""))
-        } else {
-            s.clone()
-        }
-    };
-    grid.iter()
-        .map(|r| r.iter().map(cell).collect::<Vec<_>>().join("\t"))
-        .collect::<Vec<_>>()
-        .join("\n")
-}
-
-/// TSV (from Excel, Numbers, Google Sheets) to cells. Understands quoted
-/// cells with tabs and line breaks inside; a trailing line break adds no row.
-pub fn parse_tsv(text: &str) -> Vec<Vec<String>> {
-    let mut rows = Vec::new();
-    let mut row = Vec::new();
-    let mut cell = String::new();
-    let mut quoted = false;
-    let mut at_cell_start = true;
-    let mut chars = text.chars().peekable();
-    while let Some(ch) = chars.next() {
-        if quoted {
-            if ch == '"' {
-                if chars.peek() == Some(&'"') {
-                    chars.next();
-                    cell.push('"');
-                } else {
-                    quoted = false;
-                }
-            } else {
-                cell.push(ch);
-            }
-            continue;
-        }
-        match ch {
-            '"' if at_cell_start => {
-                quoted = true;
-                at_cell_start = false;
-            }
-            '\t' => {
-                row.push(std::mem::take(&mut cell));
-                at_cell_start = true;
-            }
-            '\r' => {}
-            '\n' => {
-                row.push(std::mem::take(&mut cell));
-                rows.push(std::mem::take(&mut row));
-                at_cell_start = true;
-            }
-            c => {
-                cell.push(c);
-                at_cell_start = false;
-            }
-        }
-    }
-    if !cell.is_empty() || !row.is_empty() {
-        row.push(cell);
-        rows.push(row);
-    }
-    rows
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::grid::{copy, parse_tsv, paste, to_tsv};
 
     fn cast(p: &mut Project, names: &[&str]) {
         for n in names {
@@ -677,7 +618,8 @@ mod tests {
     #[test]
     fn paste_adds_rows_and_reports_bad_cells() {
         let mut p = Project::default();
-        let (rows, errors) = Sheet::Transmitters.paste(
+        let (rows, errors) = paste(
+            &Sheet::Transmitters,
             &mut p,
             0,
             0,
@@ -697,7 +639,7 @@ mod tests {
         cast(&mut p, &["Anna Lee", "Ben Ott", "Cleo"]);
         p.cast[1].short = "BO".into();
         let r = Sheet::Roles.insert(&mut p, 0);
-        Sheet::Roles.set(&mut p, r, 0, "Elphaba").unwrap();
+        Sheet::Roles.set(&mut p, r, 0, "Mara").unwrap();
         Sheet::Roles.set(&mut p, r, 1, "anna lee").unwrap();
         Sheet::Roles.set(&mut p, r, 2, "BO (cover), Cleo").unwrap();
         assert_eq!(Sheet::Roles.text(&p, r, 1), "Anna Lee");
@@ -734,6 +676,6 @@ mod tests {
         assert!(Sheet::Cast.set(&mut p, c, 4, "Pink").is_err());
         Sheet::Cast.set(&mut p, c, 4, "Blue").unwrap();
         assert_eq!(Sheet::Cast.color(&p, c), "blue");
-        assert_eq!(Sheet::Cast.copy(&p, &[c]), "\t\t\t\tblue");
+        assert_eq!(copy(&Sheet::Cast, &p, &[c]), "\t\t\t\tblue");
     }
 }

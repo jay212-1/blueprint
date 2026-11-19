@@ -17,7 +17,7 @@
 
 use crate::theme;
 use bp_core::model::COLORS;
-use bp_core::sheet::{to_tsv, ColKind, Column};
+use bp_core::grid::{to_tsv, CellMark, ColKind, Column};
 use egui::{
     Align2, Color32, Event, EventFilter, FontId, Id, Key, Rect, Sense, Stroke, StrokeKind, Ui,
     UiBuilder,
@@ -66,6 +66,8 @@ pub struct TableState {
     drag: Option<Drag>,
     /// Scroll so the cursor row is visible.
     reveal: bool,
+    /// Scroll sideways so the cursor cell is visible (once it is drawn).
+    reveal_cell: bool,
     offset: f32,
     view_h: f32,
     /// Give the table the keyboard focus next frame.
@@ -81,6 +83,7 @@ impl TableState {
             self.anchor = *r;
         }
         self.reveal = true;
+        self.reveal_cell = true;
         self.focus = true;
     }
 
@@ -118,6 +121,7 @@ impl TableState {
             self.anchor = row;
         }
         self.reveal = true;
+        self.reveal_cell = true;
     }
 
     fn clamp(&mut self, rows: usize, cols: usize) {
@@ -148,12 +152,16 @@ pub struct TableView<'a> {
     pub people: &'a [String],
     /// Shown when there are no rows.
     pub empty_hint: &'a str,
+    /// Per cell colour, problem and hint.
+    pub mark: &'a dyn Fn(usize, usize) -> Option<CellMark>,
+    /// Rows can be inserted, deleted and moved.
+    pub rows_editable: bool,
 }
 
 impl TableView<'_> {
     fn choices(&self, col: usize) -> Option<Vec<String>> {
         match &self.columns.get(col)?.kind {
-            ColKind::Choice(c) => Some(c.iter().map(|s| s.to_string()).collect()),
+            ColKind::Choice(c) => Some(c.clone()),
             ColKind::Color => Some(COLORS.iter().map(|s| s.to_string()).collect()),
             ColKind::Person => Some(
                 std::iter::once(String::new())
@@ -162,6 +170,10 @@ impl TableView<'_> {
             ),
             _ => None,
         }
+    }
+
+    fn fixed(&self, col: usize) -> bool {
+        self.columns.get(col).is_none_or(|c| c.kind == ColKind::Fixed)
     }
 
     fn copy(&self, rows: &[usize]) -> String {
@@ -349,10 +361,14 @@ fn keyboard(ui: &mut Ui, state: &mut TableState, view: &TableView, actions: &mut
                         let (r, c) = step(r, c, rows, cols, !modifiers.shift);
                         state.move_to(r, c, false);
                     }
-                    Key::Enter if cmd => actions.push(Action::Insert {
-                        at: if rows == 0 { 0 } else { r + 1 },
-                    }),
-                    Key::Enter | Key::F2 if rows > 0 => {
+                    Key::Enter if cmd => {
+                        if view.rows_editable {
+                            actions.push(Action::Insert {
+                                at: if rows == 0 { 0 } else { r + 1 },
+                            })
+                        }
+                    }
+                    Key::Enter | Key::F2 if rows > 0 && !view.fixed(c) => {
                         state.editing = Some(Editing {
                             row: r,
                             col: c,
@@ -361,11 +377,13 @@ fn keyboard(ui: &mut Ui, state: &mut TableState, view: &TableView, actions: &mut
                         });
                     }
                     Key::Backspace | Key::Delete if cmd && rows > 0 => {
-                        actions.push(Action::Delete {
-                            rows: state.rows_or_cursor(),
-                        });
+                        if view.rows_editable {
+                            actions.push(Action::Delete {
+                                rows: state.rows_or_cursor(),
+                            });
+                        }
                     }
-                    Key::Backspace | Key::Delete if rows > 0 => actions.push(Action::Set {
+                    Key::Backspace | Key::Delete if rows > 0 && !view.fixed(c) => actions.push(Action::Set {
                         row: r,
                         col: c,
                         value: String::new(),
@@ -380,7 +398,7 @@ fn keyboard(ui: &mut Ui, state: &mut TableState, view: &TableView, actions: &mut
                     _ => {}
                 }
             }
-            Event::Text(t) if rows > 0 && state.editing.is_none() => {
+            Event::Text(t) if rows > 0 && state.editing.is_none() && !view.fixed(state.cursor.1) => {
                 let (r, c) = state.cursor;
                 state.editing = Some(Editing {
                     row: r,
@@ -423,7 +441,7 @@ fn header(ui: &mut Ui, view: &TableView, widths: &[f32], total_w: f32) {
         p.with_clip_rect(r.shrink(2.0)).text(
             egui::pos2(r.left() + PAD, r.center().y),
             Align2::LEFT_CENTER,
-            c.title,
+            &c.title,
             FontId::proportional(12.5),
             theme::MUTED,
         );
@@ -471,7 +489,8 @@ fn draw_row(
 
     // Row number: select, drag to reorder.
     let handle = Rect::from_min_size(rect.min, egui::vec2(HANDLE_W, ROW_H));
-    let hr = ui.interact(handle, id.with(("handle", row)), Sense::click_and_drag());
+    let sense = if view.rows_editable { Sense::click_and_drag() } else { Sense::click() };
+    let hr = ui.interact(handle, id.with(("handle", row)), sense);
     ui.painter().text(
         egui::pos2(handle.right() - PAD, handle.center().y),
         Align2::RIGHT_CENTER,
@@ -479,7 +498,7 @@ fn draw_row(
         FontId::monospace(12.0),
         if hr.hovered() { theme::TEXT } else { theme::MUTED },
     );
-    if hr.hovered() {
+    if hr.hovered() && view.rows_editable {
         ui.ctx().set_cursor_icon(egui::CursorIcon::Grab);
     }
     if hr.clicked() {
@@ -528,9 +547,19 @@ fn draw_row(
             edit_cell(ui, state, view, cell);
             continue;
         }
-        let resp = ui.interact(cell, id.with(("cell", row, col)), Sense::click());
+        let mut resp = ui.interact(cell, id.with(("cell", row, col)), Sense::click());
         let text = (view.text)(row, col);
+        let mark = (view.mark)(row, col);
         let p = ui.painter();
+        if let Some(m) = &mark {
+            if let Some(c) = theme::color(&m.color) {
+                p.rect_filled(cell.shrink(1.0), 2.0, c.gamma_multiply(0.28));
+            }
+            if m.warn {
+                p.rect_stroke(cell.shrink(2.0), 2.0, Stroke::new(1.5, theme::ERROR), StrokeKind::Inside);
+            }
+        }
+        let text_color = if view.fixed(col) && col > 0 { theme::MUTED } else { theme::TEXT };
         if view.columns[col].kind == ColKind::Color {
             if let Some(c) = theme::color(&text) {
                 p.circle_filled(egui::pos2(cell.left() + PAD + 6.0, cell.center().y), 6.0, c);
@@ -540,7 +569,7 @@ fn draw_row(
                 Align2::LEFT_CENTER,
                 &text,
                 FontId::proportional(13.5),
-                theme::TEXT,
+                text_color,
             );
         } else {
             p.with_clip_rect(cell.shrink(1.0)).text(
@@ -548,14 +577,22 @@ fn draw_row(
                 Align2::LEFT_CENTER,
                 &text,
                 FontId::proportional(13.5),
-                theme::TEXT,
+                text_color,
             );
+        }
+        if let Some(m) = mark.filter(|m| !m.hint.is_empty()) {
+            resp = resp.on_hover_text(m.hint);
         }
         p.vline(
             cell.right() - 0.5,
             cell.y_range(),
             Stroke::new(1.0, Color32::from_rgb(30, 33, 41)),
         );
+        if is_cursor && state.reveal_cell {
+            state.reveal_cell = false;
+            ui.scroll_to_rect(cell, None);
+        }
+        let p = ui.painter();
         if is_cursor {
             p.rect_stroke(
                 cell.shrink(1.0),
@@ -567,7 +604,7 @@ fn draw_row(
         if resp.clicked() {
             click_select(ui, state, id, row, col);
         }
-        if resp.double_clicked() {
+        if resp.double_clicked() && !view.fixed(col) {
             state.editing = Some(Editing {
                 row,
                 col,
@@ -612,10 +649,12 @@ fn draw_row(
             }
             resp.context_menu(|ui| {
                 pick(ui, actions);
-                ui.separator();
-                row_menu(ui, state, row, actions);
+                if view.rows_editable {
+                    ui.separator();
+                    row_menu(ui, state, row, actions);
+                }
             });
-        } else {
+        } else if view.rows_editable {
             resp.context_menu(|ui| row_menu(ui, state, row, actions));
         }
     }

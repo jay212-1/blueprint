@@ -9,3 +9,13 @@
 - 2026-11-19: Kein `RUST_MIN_STACK` in `.cargo/config.toml`: damit stürzte rustc beim Bauen von wgpu/LLVM ab. Im Typst-Prototyp war die Variable nur für den LTO-Link nötig; für M2 prüfen und ggf. nur im Release-Bau setzen.
 - 2026-11-19: Release-Repo `jay212-1/blueprint-releases`, Bundle-ID `com.cheter.blueprint`, Windows-AppId `{152A3A39-AF82-47BD-A7FF-4376CC77D835}`.
 - 2026-11-19: Nur Zeichen aus egui-Standardschriften in UI-Texten (z. B. kein „▾“; der Pfeil wird gezeichnet).
+- 2026-11-19: Während der Meilensteine aus dem ersten Prompt (M2–M6) bleibt Blueprint bei 0.1.0, neue Punkte kommen in den 0.1.0-Abschnitt des CHANGELOG (Wunsch von Jan).
+- 2026-11-19: Mikrofonplan per Referenz: jede Rolle hat ihren üblichen Sender („Track“, optional B-Sender), Ausnahmen pro Szene. Wer ihn trägt, folgt aus der Besetzung bzw. Tagesbesetzung, wer auf der Bühne ist, aus den Szenen. Matrix, Swaps und Prüfungen werden daraus berechnet (`MicView`), nichts doppelt gespeichert.
+- 2026-11-19: Ein Swap ist ein Wechsel der Person (nicht der Rolle) an einem Sender zwischen zwei Einsätzen; das Zeitfenster ist Ende der letzten bis Start der nächsten Szene. Szenen ohne Startzeit beginnen am Ende der vorigen.
+- 2026-11-19: Doppelt belegt heißt: zwei verschiedene Personen am selben Sender in derselben Szene. Eine Person in zwei Rollen gleichzeitig ist eine eigene Warnung.
+- 2026-11-19: Intermodulation 3. Ordnung (2·f1 − f2) ist eingebaut, aber standardmäßig aus (Schutzabstand 100 kHz einstellbar).
+- 2026-11-19: Alle Tabellen laufen über ein gemeinsames `Grid`-Interface (bp-core/grid.rs); Stammdaten und Plan-Ansichten nutzen denselben Editor, dasselbe Copy/Paste und dasselbe Undo.
+- 2026-11-19: Druckdaten gehen als JSON über `sys.inputs` in die Typst-Vorlagen (`crates/bp-print/templates`), die Vorlagen sind per `include_str!` eingebaut. Breite Mic-Plots werden gleichmäßig auf Blöcke verteilt.
+- 2026-11-19: Revisionen: „Rev N ausgeben“ speichert den Stand; markiert werden Änderungen gegen die Revision davor (wie in Theater-Paperwork üblich).
+- 2026-11-19: serde_json mit `float_roundtrip`, sonst ändern sich Frequenzen beim Laden in der letzten Stelle.
+- 2026-11-19: Demo-Musical „The Lighthouse Keeper“ ist frei erfunden (keine echten Stücke oder Figuren).

@@ -10,9 +10,10 @@ rust-version = "1.85"
 
 [workspace.dependencies]
 serde = { version = "1", features = ["derive"] }
-serde_json = "1"
+serde_json = { version = "1", features = ["float_roundtrip"] }
 thiserror = "2"
 bp-core = { path = "crates/bp-core" }
+bp-print = { path = "crates/bp-print" }
 
 [workspace.lints.rust]
 unsafe_code = "deny"
