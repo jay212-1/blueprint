@@ -62,3 +62,5 @@
   desks and port labels for the stageboxes.
 - The demo band show has a full patch: 26 inputs on two stageboxes, split to FOH, monitors and the
   recording, 12 outputs.
+- Tables: the menu button of a choice cell no longer blinks when the pointer moves onto it, and an
+  open menu stays put when the pointer leaves the cell.

@@ -418,3 +418,36 @@ fn patch_pages_and_checks() {
     let pdf = dir.path().join("labels.pdf");
     assert!(h.state_mut().export_pdf(bp_print::Doc::Labels, &pdf));
 }
+
+#[test]
+fn choice_menu_button_stays_when_the_pointer_moves_onto_it() {
+    use bp_core::patch_grid::PatchSheet;
+    let mut h = harness();
+    h.get_by_label_contains("demo band show").click();
+    settle(&mut h);
+    h.state_mut().page = Page::Patch(PatchSheet::Inputs);
+    settle(&mut h);
+    let arrows = |h: &Harness<'static, App>| h.query_all_by_label("  ").count();
+    let base = arrows(&h);
+    // The "Stand" cell of row 3 (x 688..756, rows 28 px from y 157).
+    let cell = egui::pos2(720.0, 171.0 + 28.0 * 3.0);
+    h.input_mut().events.push(Event::PointerMoved(cell));
+    settle(&mut h);
+    assert_eq!(arrows(&h), base + 1, "hovering a choice cell shows its menu button");
+    // Onto the arrow at the right end of the cell.
+    h.input_mut().events.push(Event::PointerMoved(egui::pos2(745.0, cell.y)));
+    for _ in 0..4 {
+        h.step();
+        assert_eq!(arrows(&h), base + 1, "the button must not blink away");
+    }
+    // Open the menu, move away: it stays open where it was.
+    h.get_by_label("  ").click();
+    settle(&mut h);
+    assert!(h.query_by_label("Tall").is_some(), "the menu is open");
+    h.input_mut().events.push(Event::PointerMoved(egui::pos2(900.0, 600.0)));
+    settle(&mut h);
+    assert!(h.query_by_label("Tall").is_some(), "still open after the pointer left the cell");
+    h.get_by_label("Tall").click();
+    settle(&mut h);
+    assert_eq!(project(&h).patch.inputs[3].stand, bp_core::patch::Stand::Tall);
+}

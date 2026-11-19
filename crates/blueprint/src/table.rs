@@ -72,6 +72,8 @@ pub struct TableState {
     view_h: f32,
     /// Give the table the keyboard focus next frame.
     focus: bool,
+    /// The cell whose choice menu is open (its button stays drawn).
+    menu: Option<(usize, usize)>,
 }
 
 impl TableState {
@@ -627,13 +629,22 @@ fn draw_row(
                     }
                 }
             };
-            if is_cursor || resp.hovered() {
+            // The pointer over the cell, not only "hovered": over the
+            // button the cell is not hovered, and the button would blink.
+            let open = state.menu == Some((row, col));
+            if is_cursor || open || ui.rect_contains_pointer(cell) {
                 let b = Rect::from_min_size(
                     egui::pos2(cell.right() - 22.0, cell.top() + 4.0),
                     egui::vec2(18.0, ROW_H - 8.0),
                 );
                 ui.scope_builder(UiBuilder::new().max_rect(b), |ui| {
-                    let r = ui.menu_button("  ", |ui| pick(ui, actions)).response;
+                    let m = ui.menu_button("  ", |ui| pick(ui, actions));
+                    if m.inner.is_some() {
+                        state.menu = Some((row, col));
+                    } else if open {
+                        state.menu = None;
+                    }
+                    let r = m.response;
                     // A small down arrow (the default fonts have no glyph for it).
                     let c = r.rect.center();
                     ui.painter().add(egui::Shape::convex_polygon(
