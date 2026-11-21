@@ -49,6 +49,16 @@ plan: channel names, the patch, the mic plan per scene and the DCAs. Blueprint w
   // Radio mics; "channel" is the desk / receiver channel as written in the plan.
   "transmitters": [{ "channel": "12", "name": "", "model": "", "frequency_mhz": 518.2, "status": "active" }],
 
+  // The devices of the patch (Pulse takes them over as its inventory).
+  "devices": [{
+    "name": "SB1",
+    "kind": "stagebox",        // stagebox, io-rack, console, splitter, amp, recorder, iem, other
+    "location": "Stage left",  // the location's name, or ""
+    "model": "DL32",
+    "address": "192.168.1.31", // IP address or host name on the show network, or ""
+    "notes": ""
+  }],
+
   // The mic plan, scene by scene.
   "scenes": [{
     "number": "1.1", "title": "Harbour",
@@ -61,3 +71,6 @@ plan: channel names, the patch, the mic plan per scene and the DCAs. Blueprint w
 `status` is `active`, `spare` or `defect`. `b` marks the role's second (B) mic. A scene's `mics`
 lists every transmitter in use in that scene: one entry per role, so a shared transmitter can appear
 twice.
+
+`devices` came later in version 1; older files have none (empty list). `address` is the
+Address column of the device table.

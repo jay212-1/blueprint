@@ -33,6 +33,37 @@ pub struct Exchange {
     pub scenes: Vec<Scene>,
     /// The radio mics (transmitters) with their desk channels.
     pub transmitters: Vec<RadioMic>,
+    /// The devices of the patch, with their network address if known.
+    pub devices: Vec<ExDevice>,
+}
+
+#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Default)]
+#[serde(default)]
+pub struct ExDevice {
+    pub name: String,
+    /// "stagebox", "io-rack", "console", "splitter", "amp", "recorder", "iem" or "other".
+    pub kind: String,
+    /// The location's name ("FOH", "Stage left").
+    pub location: String,
+    pub model: String,
+    /// IP address or host name, "" if not known.
+    pub address: String,
+    pub notes: String,
+}
+
+/// The exchange name of a device kind.
+pub fn kind_name(k: crate::patch::DeviceKind) -> &'static str {
+    use crate::patch::DeviceKind::*;
+    match k {
+        Stagebox => "stagebox",
+        IoRack => "io-rack",
+        Console => "console",
+        Splitter => "splitter",
+        Amp => "amp",
+        Recorder => "recorder",
+        Iem => "iem",
+        Other => "other",
+    }
 }
 
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Default)]
@@ -207,6 +238,18 @@ pub fn export(p: &Project, generator: &str) -> Exchange {
             Scene { number: s.number.clone(), title: s.title.clone(), mics, dcas }
         })
         .collect();
+    let devices = pa
+        .devices
+        .iter()
+        .map(|d| ExDevice {
+            name: d.name.clone(),
+            kind: kind_name(d.kind).into(),
+            location: d.location.and_then(|l| p.locations.iter().find(|x| x.id == l)).map(|l| l.name.clone()).unwrap_or_default(),
+            model: d.model.clone(),
+            address: d.address.trim().to_string(),
+            notes: d.notes.clone(),
+        })
+        .collect();
     Exchange {
         format: FORMAT.into(),
         version: VERSION,
@@ -221,6 +264,7 @@ pub fn export(p: &Project, generator: &str) -> Exchange {
         outputs,
         scenes,
         transmitters,
+        devices,
     }
 }
 
@@ -244,6 +288,26 @@ pub fn read(json: &str) -> Result<Exchange, String> {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn devices_go_out_with_kind_location_and_address() {
+        let mut p = crate::demo::band();
+        let sb = p.patch.devices.iter().position(|d| d.name == "SB1").unwrap();
+        p.patch.devices[sb].address = "192.168.1.31".into();
+        let x = export(&p, "Blueprint test");
+        assert_eq!(x.devices.len(), p.patch.devices.len());
+        let d = x.devices.iter().find(|d| d.name == "SB1").unwrap();
+        assert_eq!((d.kind.as_str(), d.address.as_str()), ("stagebox", "192.168.1.31"));
+        assert!(!d.location.is_empty());
+        assert!(x.devices.iter().any(|d| d.kind == "console"));
+        // Older readers and files: devices are optional.
+        let old = read(r#"{"format":"showtime-exchange","version":1}"#).unwrap();
+        assert!(old.devices.is_empty());
+        // The project file leaves empty addresses out.
+        let other = p.patch.devices.iter().find(|d| d.address.is_empty()).unwrap();
+        assert!(!serde_json::to_string(other).unwrap().contains("address"));
+        assert!(serde_json::to_string(&p.patch.devices[sb]).unwrap().contains("\"address\":\"192.168.1.31\""));
+    }
 
     #[test]
     fn the_band_patch_goes_out_and_back() {

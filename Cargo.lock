@@ -597,7 +597,7 @@ dependencies = [
 
 [[package]]
 name = "blueprint"
-version = "0.2.3"
+version = "0.2.4"
 dependencies = [
  "bp-core",
  "bp-print",
@@ -618,7 +618,7 @@ dependencies = [
 
 [[package]]
 name = "bp-core"
-version = "0.2.3"
+version = "0.2.4"
 dependencies = [
  "base64 0.22.1",
  "calamine",
@@ -630,7 +630,7 @@ dependencies = [
 
 [[package]]
 name = "bp-print"
-version = "0.2.3"
+version = "0.2.4"
 dependencies = [
  "bp-core",
  "serde",

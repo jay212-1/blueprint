@@ -290,6 +290,7 @@ impl Grid for PatchGrid<'_> {
                 col("In use", Fixed, 90.0),
                 col("Notes", Text, 200.0),
                 col("Colour", Color, 80.0),
+                col("Address", Text, 130.0),
             ],
             PatchSheet::Lines => vec![
                 col("Name", Text, 130.0),
@@ -380,6 +381,7 @@ impl Grid for PatchGrid<'_> {
                     }
                     8 => d.notes.clone(),
                     9 => d.color.clone(),
+                    10 => d.address.clone(),
                     _ => String::new(),
                 }
             }
@@ -492,6 +494,12 @@ impl Grid for PatchGrid<'_> {
                     6 => d.connector = Connector::parse(t).ok_or(format!("\"{t}\" is not a connector (XLR, jack, AES, network, Speakon)"))?,
                     8 => d.notes = v.into(),
                     9 => d.color = parse_color(t)?,
+                    10 => {
+                        if t.chars().any(|c| c.is_whitespace() || c == '/') {
+                            return Err(format!("\"{t}\" is not an IP address or host name"));
+                        }
+                        d.address = t.into()
+                    }
                     _ => return Err("this column is worked out".into()),
                 }
                 if let Some(slot) = p.patch.devices.get_mut(row) {

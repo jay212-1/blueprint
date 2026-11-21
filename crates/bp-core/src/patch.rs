@@ -137,6 +137,9 @@ pub struct Device {
     pub connector: Connector,
     pub notes: String,
     pub color: String,
+    /// IP address or host name on the show network (for Pulse), optional.
+    #[serde(skip_serializing_if = "String::is_empty")]
+    pub address: String,
 }
 
 #[derive(Serialize, Deserialize, Clone, Copy, Debug, PartialEq, Eq, Default, Hash)]

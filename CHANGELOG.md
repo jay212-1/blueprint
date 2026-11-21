@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.2.4
+
+- Devices get an Address column (IP address or host name on the show network, optional).
+- The exchange file lists the devices of the patch (name, kind, location, model, address, notes),
+  so Pulse can take them over as its inventory. Still version 1: older readers ignore the new list.
+
 ## 0.2.3
 
 - Back to the fully optimised release build for local installs: `install-mac.sh` and `install.sh`
