@@ -28,9 +28,7 @@ fi
 setup_rust
 
 ui_section "Bauen"
-# The quick profile: no link-time optimisation, incremental (seconds per
-# change instead of minutes). Releases are built with release.sh.
-PROFILE="${PROFILE:-local}" ./packaging/macos/build-dmg.sh
+./packaging/macos/build-dmg.sh
 V=$(sed -n 's/^version = "\(.*\)"/\1/p' Cargo.toml | head -n 1)
 DMG="dist/Blueprint-$V.dmg"
 

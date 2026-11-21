@@ -48,3 +48,4 @@
 - 2026-11-19: Stimmlage als freier Text am Cast (Spalte nach „Short“), auf den Mic-Cards gedruckt.
 - 2026-11-19: Mic Plot zeigt „off stage, trägt den Sender“ nur zwischen zwei Szenen derselben Person auf demselben Sender (`MicView.off`); vor dem ersten und nach dem letzten Auftritt sowie zwischen zwei verschiedenen Trägern (Swap) bleibt die Zelle leer.
 - 2026-11-19: Lokale Installation baut mit eigenem Cargo-Profil `local` (ohne LTO, inkrementell): Änderung ~10 s statt ~3,5 min, Versionssprung ~35 s. Releases bleiben bei `release` (thin LTO).
+- 2026-11-21: Lokale Installation baut immer die Release-Version (Wunsch von Jan); das Profil `local` aus 0.2.2 ist wieder entfernt, auch wenn es länger dauert.

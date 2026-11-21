@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.2.3
+
+- Back to the fully optimised release build for local installs: `install-mac.sh` and `install.sh`
+  build with `--release` again, the `local` profile of 0.2.2 is gone.
+
 ## 0.2.2
 
 - Faster local installs: `install-mac.sh` and `install.sh` build with the new `local` profile (no

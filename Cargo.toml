@@ -3,7 +3,7 @@ resolver = "2"
 members = ["crates/*"]
 
 [workspace.package]
-version = "0.2.2"
+version = "0.2.3"
 edition = "2021"
 license = "MIT OR Apache-2.0"
 rust-version = "1.85"
@@ -36,12 +36,3 @@ debug = "line-tables-only"
 [profile.dev.package."*"]
 opt-level = 2
 debug = false
-
-# For install-mac.sh / install.sh on your own computer: like release, but
-# without link-time optimisation and with incremental builds, so a change
-# rebuilds in well under a minute instead of minutes. Releases keep `release`.
-[profile.local]
-inherits = "release"
-lto = "off"
-codegen-units = 256
-incremental = true
