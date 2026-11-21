@@ -1,5 +1,10 @@
 # Changelog
 
+## 1.0.0
+
+- First stable release: the development phase is complete. From here on there are fixes and smaller
+  improvements.
+
 ## 0.2.4
 
 - Devices get an Address column (IP address or host name on the show network, optional).
